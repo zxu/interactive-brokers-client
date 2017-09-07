@@ -26,6 +26,8 @@ public class IBClientMain {
     private ScheduledFuture<?> checkConnection;
 
     private Group tradeGroup;
+    private Label connectionStatusLabel;
+    private Button connectionButton;
 
     private void startWatching() {
         final Runnable checker = new Runnable() {
@@ -37,6 +39,8 @@ public class IBClientMain {
                     public void run() {
                         boolean connected = ibActions.isConnected();
                         tradeGroup.setEnabled(connected);
+                        connectionStatusLabel.setText(connected ? "Connected" : "Disconnected");
+                        connectionButton.setText(connected ? "Disconnect" : "Connect");
                     }
                 });
             }
@@ -64,63 +68,70 @@ public class IBClientMain {
 
         shell.setLayout(new GridLayout());
 
-        GridLayout connectionGroupGridLayout = new GridLayout(1, false);
-        connectionGroupGridLayout.marginWidth = 0;
-        connectionGroupGridLayout.marginHeight = 0;
-        connectionGroupGridLayout.verticalSpacing = 0;
-        connectionGroupGridLayout.horizontalSpacing = 0;
+        /**
+         * Set up the "connection" region of the UI
+         */
+        {
+            GridLayout gridLayout = new GridLayout(2, false);
 
-        Group connectionGroup = new Group(shell, SWT.NONE);
-        connectionGroup.setLayout(connectionGroupGridLayout);
-        connectionGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
-        connectionGroup.setText("Connection");
+            Group group = new Group(shell, SWT.NONE);
+            group.setLayout(gridLayout);
+            group.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+            group.setText("Connection");
 
-        Composite compositeConnection = new Composite(connectionGroup, SWT.NONE);
-        compositeConnection.setLayout(createRowLayout());
+            connectionButton = new Button(group, SWT.PUSH);
+            connectionButton.setText("Connect");
+            connectionButton.setLayoutData(new GridData(120, SWT.DEFAULT));
 
-        Button connectionButton = new Button(compositeConnection, SWT.PUSH);
-        connectionButton.setText("Connect");
+            connectionStatusLabel = new Label(group, SWT.NONE);
+            connectionStatusLabel.setText("Disconnected");
 
-        connectionButton.addSelectionListener(widgetSelectedAdapter(e -> {
-            ibActions.connect();
-        }));
+            connectionButton.addSelectionListener(widgetSelectedAdapter(e -> {
+                if (ibActions.isConnected()) {
+                    ibActions.disconnect();
+                } else {
+                    ibActions.connect();
+                }
+            }));
+        }
 
-        GridLayout tradeGroupGridLayout = new GridLayout(2, false);
-        tradeGroupGridLayout.marginWidth = 0;
-        tradeGroupGridLayout.marginHeight = 0;
-        tradeGroupGridLayout.verticalSpacing = 0;
-        tradeGroupGridLayout.horizontalSpacing = 0;
+        /**
+         * Set up the "trade" region of the UI
+         */
+        {
+            GridLayout gridLayout = new GridLayout(2, false);
 
-        tradeGroup = new Group(shell, SWT.NONE);
-        tradeGroup.setLayout(tradeGroupGridLayout);
-        tradeGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
-        tradeGroup.setText("Trade");
+            tradeGroup = new Group(shell, SWT.NONE);
+            tradeGroup.setLayout(gridLayout);
+            tradeGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+            tradeGroup.setText("Trade");
 
-        tradeGroup.setEnabled(false);
+            tradeGroup.setEnabled(false);
 
-        Composite composite = new Composite(tradeGroup, SWT.NONE);
-        GridData gridData = new GridData();
-        gridData.horizontalSpan = 2;
-        gridData.horizontalAlignment = SWT.LEFT;
-        composite.setLayoutData(gridData);
-        composite.setLayout(createRowLayout());
+            Composite composite = new Composite(tradeGroup, SWT.NONE);
+            GridData gridData = new GridData();
+            gridData.horizontalSpan = 2;
+            gridData.horizontalAlignment = SWT.LEFT;
+            composite.setLayoutData(gridData);
+            composite.setLayout(createRowLayout());
 
-        Button buyButton = new Button(composite, SWT.RADIO);
-        buyButton.setText(" Buy");
+            Button buyButton = new Button(composite, SWT.RADIO);
+            buyButton.setText(" Buy");
 
-        Button sellButton = new Button(composite, SWT.RADIO);
-        sellButton.setText(" Sell");
+            Button sellButton = new Button(composite, SWT.RADIO);
+            sellButton.setText(" Sell");
 
-        Composite composite1 = new Composite(tradeGroup, SWT.NONE);
-        composite1.setLayout(createRowLayout());
+            Composite composite1 = new Composite(tradeGroup, SWT.NONE);
+            composite1.setLayout(createRowLayout());
 
-        Label label = new Label(composite1, SWT.NONE);
-        label.setText("Trailing amount: ");
+            Label label = new Label(composite1, SWT.NONE);
+            label.setText("Trailing amount: ");
 
-        Text text = new Text(composite1, SWT.BORDER);
-        text.setLayoutData(new RowData(100, SWT.DEFAULT));
+            Text text = new Text(composite1, SWT.BORDER);
+            text.setLayoutData(new RowData(100, SWT.DEFAULT));
 
-        new Button(composite1, SWT.PUSH).setText("Place Order");
+            new Button(composite1, SWT.PUSH).setText("Place Order");
+        }
 
         shell.pack();
         shell.open();

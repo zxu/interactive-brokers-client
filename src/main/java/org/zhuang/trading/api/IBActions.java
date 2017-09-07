@@ -12,8 +12,11 @@ public class IBActions {
 
     public void connect() {
         final EClientSocket client = wrapper.getClient();
-        final EReaderSignal signal = wrapper.getSignal();
-
         client.eConnect("127.0.0.1", 7497, 0);
+    }
+
+    public void disconnect() {
+        final EClientSocket client = wrapper.getClient();
+        client.eDisconnect();
     }
 }
