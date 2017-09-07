@@ -1,13 +1,15 @@
 package org.zhuang.trading;
 
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.events.ModifyEvent;
+import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
-import org.eclipse.swt.layout.RowData;
 import org.eclipse.swt.layout.RowLayout;
 import org.eclipse.swt.widgets.*;
 import org.zhuang.trading.api.IBActions;
 
+import java.util.HashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -29,10 +31,12 @@ public class IBClientMain {
     private Label connectionStatusLabel;
     private Button connectionButton;
 
+    private HashMap<String, String> data = new HashMap<>();
+
     private void startWatching() {
         final Runnable checker = new Runnable() {
             public void run() {
-                System.out.println(ibActions.isConnected());
+//                System.out.println(ibActions.isConnected());
 
                 display.asyncExec(new Runnable() {
                     @Override
@@ -49,6 +53,7 @@ public class IBClientMain {
     }
 
     private void stopWatching() {
+        ibActions.disconnect();
         checkConnection.cancel(true);
         scheduler.shutdown();
     }
@@ -99,7 +104,7 @@ public class IBClientMain {
          * Set up the "trade" region of the UI
          */
         {
-            GridLayout gridLayout = new GridLayout(2, false);
+            GridLayout gridLayout = new GridLayout(3, false);
 
             tradeGroup = new Group(shell, SWT.NONE);
             tradeGroup.setLayout(gridLayout);
@@ -108,29 +113,90 @@ public class IBClientMain {
 
             tradeGroup.setEnabled(false);
 
-            Composite composite = new Composite(tradeGroup, SWT.NONE);
-            GridData gridData = new GridData();
-            gridData.horizontalSpan = 2;
-            gridData.horizontalAlignment = SWT.LEFT;
-            composite.setLayoutData(gridData);
-            composite.setLayout(createRowLayout());
+            {
+                Composite composite = new Composite(tradeGroup, SWT.NONE);
+                GridData gridData = new GridData();
+                gridData.horizontalSpan = 3;
+                gridData.horizontalAlignment = SWT.LEFT;
+                composite.setLayoutData(gridData);
+                composite.setLayout(createRowLayout());
 
-            Button buyButton = new Button(composite, SWT.RADIO);
-            buyButton.setText(" Buy");
+                Button buyButton = new Button(composite, SWT.RADIO);
+                buyButton.setText(" Buy");
+                buyButton.addSelectionListener(widgetSelectedAdapter(e -> {
+                    data.put("Action", "BUY");
+                }));
 
-            Button sellButton = new Button(composite, SWT.RADIO);
-            sellButton.setText(" Sell");
+                Button sellButton = new Button(composite, SWT.RADIO);
+                sellButton.setText(" Sell");
+                sellButton.addSelectionListener(widgetSelectedAdapter(e -> {
+                    data.put("Action", "SELL");
+                }));
+            }
 
-            Composite composite1 = new Composite(tradeGroup, SWT.NONE);
-            composite1.setLayout(createRowLayout());
+            {
+                Label label = new Label(tradeGroup, SWT.NONE);
+                label.setText("Symbol: ");
 
-            Label label = new Label(composite1, SWT.NONE);
-            label.setText("Trailing amount: ");
+                Text text = new Text(tradeGroup, SWT.BORDER);
 
-            Text text = new Text(composite1, SWT.BORDER);
-            text.setLayoutData(new RowData(100, SWT.DEFAULT));
+                GridData gridData = new GridData(100, SWT.DEFAULT);
+                gridData.horizontalSpan = 2;
+                gridData.horizontalAlignment = SWT.LEFT;
+                text.setLayoutData(gridData);
+                text.addModifyListener(getModifyListener("Symbol"));
+            }
 
-            new Button(composite1, SWT.PUSH).setText("Place Order");
+            {
+                Label label = new Label(tradeGroup, SWT.NONE);
+                label.setText("Contract month: ");
+
+                Text text = new Text(tradeGroup, SWT.BORDER);
+
+                GridData gridData = new GridData(100, SWT.DEFAULT);
+                gridData.horizontalSpan = 2;
+                gridData.horizontalAlignment = SWT.LEFT;
+                text.setLayoutData(gridData);
+                text.addModifyListener(getModifyListener("Month"));
+            }
+
+            {
+                Label label = new Label(tradeGroup, SWT.NONE);
+                label.setText("Exchange: ");
+
+                Text text = new Text(tradeGroup, SWT.BORDER);
+
+                GridData gridData = new GridData(100, SWT.DEFAULT);
+                gridData.horizontalSpan = 2;
+                gridData.horizontalAlignment = SWT.LEFT;
+                text.setLayoutData(gridData);
+                text.addModifyListener(getModifyListener("Exchange"));
+            }
+
+            {
+                Label label = new Label(tradeGroup, SWT.NONE);
+                label.setText("Trailing amount: ");
+
+                Text text = new Text(tradeGroup, SWT.BORDER);
+                text.setLayoutData(new GridData(100, SWT.DEFAULT));
+                text.addModifyListener(getModifyListener("TrailingStopAmount"));
+
+                Button button = new Button(tradeGroup, SWT.PUSH);
+                button.setText("Place Order");
+                button.addSelectionListener(widgetSelectedAdapter(e -> {
+                    System.out.println(String.format("%s-%s: %s - %s",
+                            data.get("Symbol"),
+                            data.get("Month"),
+                            data.get("Exchange"),
+                            data.get("Action")));
+
+                    ibActions.placeFutureOrder(data.get("Symbol"),
+                            data.get("Month"),
+                            data.get("Exchange"),
+                            data.get("Action"),
+                            Double.parseDouble(data.get("TrailingStopAmount")));
+                }));
+            }
         }
 
         shell.pack();
@@ -156,5 +222,15 @@ public class IBClientMain {
         rowLayout.marginBottom = 5;
         rowLayout.spacing = 5;
         return rowLayout;
+    }
+
+    private ModifyListener getModifyListener(String label) {
+        return new ModifyListener() {
+            @Override
+            public void modifyText(ModifyEvent modifyEvent) {
+                String text = ((Text) modifyEvent.widget).getText();
+                data.put(label, text);
+            }
+        };
     }
 }
