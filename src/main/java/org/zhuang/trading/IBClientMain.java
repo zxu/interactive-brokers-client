@@ -9,6 +9,7 @@ import org.eclipse.swt.layout.RowLayout;
 import org.eclipse.swt.widgets.*;
 import org.zhuang.trading.api.IBActions;
 
+import java.util.DoubleSummaryStatistics;
 import java.util.HashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -19,6 +20,12 @@ import static org.eclipse.swt.events.SelectionListener.widgetSelectedAdapter;
 
 public class IBClientMain {
     private static final Display display = new Display();
+    private static final String MONTH = "Month";
+    private static final String SYMBOL = "Symbol";
+    private static final String EXCHANGE = "Exchange";
+    private static final String ACTION = "Action";
+    private static final String PRICE = "Price";
+    private static final String TRAILING_STOP_AMOUNT = "TrailingStopAmount";
 
     private IBActions ibActions = new IBActions();
 
@@ -36,8 +43,6 @@ public class IBClientMain {
     private void startWatching() {
         final Runnable checker = new Runnable() {
             public void run() {
-//                System.out.println(ibActions.isConnected());
-
                 display.asyncExec(new Runnable() {
                     @Override
                     public void run() {
@@ -124,13 +129,13 @@ public class IBClientMain {
                 Button buyButton = new Button(composite, SWT.RADIO);
                 buyButton.setText(" Buy");
                 buyButton.addSelectionListener(widgetSelectedAdapter(e -> {
-                    data.put("Action", "BUY");
+                    data.put(ACTION, "BUY");
                 }));
 
                 Button sellButton = new Button(composite, SWT.RADIO);
                 sellButton.setText(" Sell");
                 sellButton.addSelectionListener(widgetSelectedAdapter(e -> {
-                    data.put("Action", "SELL");
+                    data.put(ACTION, "SELL");
                 }));
             }
 
@@ -144,7 +149,7 @@ public class IBClientMain {
                 gridData.horizontalSpan = 2;
                 gridData.horizontalAlignment = SWT.LEFT;
                 text.setLayoutData(gridData);
-                text.addModifyListener(getModifyListener("Symbol"));
+                text.addModifyListener(getModifyListener(SYMBOL));
             }
 
             {
@@ -157,7 +162,7 @@ public class IBClientMain {
                 gridData.horizontalSpan = 2;
                 gridData.horizontalAlignment = SWT.LEFT;
                 text.setLayoutData(gridData);
-                text.addModifyListener(getModifyListener("Month"));
+                text.addModifyListener(getModifyListener(MONTH));
             }
 
             {
@@ -170,7 +175,20 @@ public class IBClientMain {
                 gridData.horizontalSpan = 2;
                 gridData.horizontalAlignment = SWT.LEFT;
                 text.setLayoutData(gridData);
-                text.addModifyListener(getModifyListener("Exchange"));
+                text.addModifyListener(getModifyListener(EXCHANGE));
+            }
+
+            {
+                Label label = new Label(tradeGroup, SWT.NONE);
+                label.setText("Limit price: ");
+
+                Text text = new Text(tradeGroup, SWT.BORDER);
+
+                GridData gridData = new GridData(100, SWT.DEFAULT);
+                gridData.horizontalSpan = 2;
+                gridData.horizontalAlignment = SWT.LEFT;
+                text.setLayoutData(gridData);
+                text.addModifyListener(getModifyListener(PRICE));
             }
 
             {
@@ -179,22 +197,25 @@ public class IBClientMain {
 
                 Text text = new Text(tradeGroup, SWT.BORDER);
                 text.setLayoutData(new GridData(100, SWT.DEFAULT));
-                text.addModifyListener(getModifyListener("TrailingStopAmount"));
+                text.addModifyListener(getModifyListener(TRAILING_STOP_AMOUNT));
+            }
 
+            {
                 Button button = new Button(tradeGroup, SWT.PUSH);
                 button.setText("Place Order");
                 button.addSelectionListener(widgetSelectedAdapter(e -> {
-                    System.out.println(String.format("%s-%s: %s - %s",
-                            data.get("Symbol"),
-                            data.get("Month"),
-                            data.get("Exchange"),
-                            data.get("Action")));
+                    System.out.println(String.format("%s %s @ %s - %s",
+                            data.get(SYMBOL),
+                            data.get(MONTH),
+                            data.get(EXCHANGE),
+                            data.get(ACTION)));
 
-                    ibActions.placeFutureOrder(data.get("Symbol"),
-                            data.get("Month"),
-                            data.get("Exchange"),
-                            data.get("Action"),
-                            Double.parseDouble(data.get("TrailingStopAmount")));
+                    ibActions.placeFutureOrder(data.get(SYMBOL),
+                            data.get(MONTH),
+                            data.get(EXCHANGE),
+                            data.get(ACTION),
+                            Double.parseDouble(data.get(PRICE)),
+                            Double.parseDouble(data.get(TRAILING_STOP_AMOUNT)));
                 }));
             }
         }
