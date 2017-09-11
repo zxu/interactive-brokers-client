@@ -44,13 +44,6 @@ public class EWrapperImpl implements EWrapper {
     public void tickPrice(int tickerId, int field, double price, int canAutoExecute) {
         System.out.println("Tick Price. Ticker Id:" + tickerId + ", Field: " + TickType.getField(field) + ", Price: " + price + ", CanAutoExecute: " + canAutoExecute);
 
-//		System.out.println("================" + marketDataEventBus.toString());
-
-//		marketDataEventBus.post(Double.valueOf(price));
-//		marketDataEventBus.post(ImmutableMap.<String, Object>builder().
-//				put("Type", TickType.getField(field))
-//				.put("Price", Double.valueOf(price)));
-
         switch (TickType.getField(field)) {
             case "bidPrice":
                 marketDataEventBus.post(MarketDataEvent.bidPriceEvent(price));
