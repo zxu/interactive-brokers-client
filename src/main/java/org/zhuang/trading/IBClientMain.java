@@ -1,5 +1,7 @@
 package org.zhuang.trading;
 
+import com.google.common.eventbus.EventBus;
+import com.google.common.eventbus.Subscribe;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
@@ -7,10 +9,16 @@ import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.layout.RowLayout;
 import org.eclipse.swt.widgets.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.stereotype.Component;
 import org.zhuang.trading.api.IBActions;
+import org.zhuang.trading.api.MarketDataEvent;
+import org.zhuang.trading.config.IBClientConfig;
 
-import java.util.DoubleSummaryStatistics;
-import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -18,16 +26,22 @@ import java.util.concurrent.ScheduledFuture;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.eclipse.swt.events.SelectionListener.widgetSelectedAdapter;
 
+@Component
 public class IBClientMain {
     private static final Display display = new Display();
-    private static final String MONTH = "Month";
+
     private static final String SYMBOL = "Symbol";
+    private static final String MONTH = "Month";
     private static final String EXCHANGE = "Exchange";
     private static final String ACTION = "Action";
     private static final String PRICE = "Price";
     private static final String TRAILING_STOP_AMOUNT = "TrailingStopAmount";
 
-    private IBActions ibActions = new IBActions();
+    @Autowired
+    private IBActions ibActions;
+
+    @Autowired
+    private EventBus marketDataEventBus;
 
     private final ScheduledExecutorService scheduler =
             Executors.newScheduledThreadPool(1);
@@ -38,7 +52,7 @@ public class IBClientMain {
     private Label connectionStatusLabel;
     private Button connectionButton;
 
-    private HashMap<String, String> data = new HashMap<>();
+    private Map<String, String> data = new ConcurrentHashMap<>();
 
     private void startWatching() {
         final Runnable checker = new Runnable() {
@@ -63,8 +77,19 @@ public class IBClientMain {
         scheduler.shutdown();
     }
 
+    @Subscribe
+    public void updateTickPrice(MarketDataEvent event) {
+        System.out.println("=================");
+//        System.out.println(String.format("%s: %d", price.get("Type"), price.get("Price")));
+        System.out.println(String.format("%s: %f", event.type(), ((Double) event.data()).doubleValue()));
+        System.out.println("=================");
+    }
+
     public static void main(String[] args) {
-        IBClientMain ibClientMain = new IBClientMain();
+        ApplicationContext context = new AnnotationConfigApplicationContext(IBClientConfig.class);
+
+        IBClientMain ibClientMain = (IBClientMain) context.getBean(IBClientMain.class);
+
         ibClientMain.startWatching();
         Shell shell = ibClientMain.open(display);
         while (!shell.isDisposed()) {
@@ -74,6 +99,8 @@ public class IBClientMain {
     }
 
     public Shell open(Display display) {
+        marketDataEventBus.register(this);
+
         Shell shell = new Shell(display);
 
         shell.setLayout(new GridLayout());
@@ -172,10 +199,21 @@ public class IBClientMain {
                 Text text = new Text(tradeGroup, SWT.BORDER);
 
                 GridData gridData = new GridData(100, SWT.DEFAULT);
-                gridData.horizontalSpan = 2;
                 gridData.horizontalAlignment = SWT.LEFT;
                 text.setLayoutData(gridData);
                 text.addModifyListener(getModifyListener(EXCHANGE));
+            }
+
+            {
+                Button button = new Button(tradeGroup, SWT.PUSH);
+                button.setText("Retrieve Price");
+                button.setLayoutData(new GridData(120, SWT.DEFAULT));
+
+                button.addSelectionListener(widgetSelectedAdapter(e -> {
+                    ibActions.retrieveMarketData(data.get(SYMBOL),
+                            data.get(MONTH),
+                            data.get(EXCHANGE));
+                }));
             }
 
             {
@@ -203,6 +241,7 @@ public class IBClientMain {
             {
                 Button button = new Button(tradeGroup, SWT.PUSH);
                 button.setText("Place Order");
+                button.setLayoutData(new GridData(120, SWT.DEFAULT));
                 button.addSelectionListener(widgetSelectedAdapter(e -> {
                     System.out.println(String.format("%s %s @ %s - %s",
                             data.get(SYMBOL),
