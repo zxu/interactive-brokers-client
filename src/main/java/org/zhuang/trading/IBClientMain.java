@@ -15,13 +15,10 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.stereotype.Component;
 import org.zhuang.trading.api.IBActions;
 import org.zhuang.trading.api.MarketDataEvent;
-import org.zhuang.trading.config.IBClientConfig;
+import org.zhuang.trading.api.MarketDataType;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.*;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.eclipse.swt.events.SelectionListener.widgetSelectedAdapter;
@@ -36,12 +33,16 @@ public class IBClientMain {
     private static final String ACTION = "Action";
     private static final String PRICE = "Price";
     private static final String TRAILING_STOP_AMOUNT = "TrailingStopAmount";
+    private static final String NEXT_ORDER_ID = "NextOrderId";
 
     @Autowired
     private IBActions ibActions;
 
     @Autowired
     private EventBus marketDataEventBus;
+
+    @Autowired
+    private ExecutorService executor;
 
     private final ScheduledExecutorService scheduler =
             Executors.newScheduledThreadPool(1);
@@ -53,21 +54,15 @@ public class IBClientMain {
     private Button connectionButton;
 
     private Map<String, String> data = new ConcurrentHashMap<>();
+    private Text textLimitPrice;
 
     private void startWatching() {
-        final Runnable checker = new Runnable() {
-            public void run() {
-                display.asyncExec(new Runnable() {
-                    @Override
-                    public void run() {
-                        boolean connected = ibActions.isConnected();
-                        tradeGroup.setEnabled(connected);
-                        connectionStatusLabel.setText(connected ? "Connected" : "Disconnected");
-                        connectionButton.setText(connected ? "Disconnect" : "Connect");
-                    }
-                });
-            }
-        };
+        final Runnable checker = () -> display.asyncExec(() -> {
+            boolean connected = ibActions.isConnected();
+            tradeGroup.setEnabled(connected);
+            connectionStatusLabel.setText(connected ? "Connected" : "Disconnected");
+            connectionButton.setText(connected ? "Disconnect" : "Connect");
+        });
         checkConnection = scheduler.scheduleAtFixedRate(checker, 1, 1, SECONDS);
     }
 
@@ -75,20 +70,49 @@ public class IBClientMain {
         ibActions.disconnect();
         checkConnection.cancel(true);
         scheduler.shutdown();
+        executor.shutdown();
     }
 
     @Subscribe
-    public void updateTickPrice(MarketDataEvent event) {
+    public void marketEventHandler(MarketDataEvent event) {
+        MarketDataType dataType = event.type();
+        if (dataType == MarketDataType.BID_PRICE || dataType == MarketDataType.ASK_PRICE) {
+            updateTickPrice(event);
+        }
+        if (dataType == MarketDataType.NEXT_ORDER_ID) {
+            updateNextOrderId(event);
+        }
+    }
+
+    private void updateNextOrderId(MarketDataEvent event) {
+        MarketDataType dataType = event.type();
+
         System.out.println("=================");
-//        System.out.println(String.format("%s: %d", price.get("Type"), price.get("Price")));
-        System.out.println(String.format("%s: %f", event.type(), ((Double) event.data()).doubleValue()));
+        System.out.println(String.format("%s: %d", dataType, (Integer) event.data()));
         System.out.println("=================");
+
+        data.put(NEXT_ORDER_ID, event.data().toString());
+    }
+
+    private void updateTickPrice(final MarketDataEvent event) {
+        MarketDataType dataType = event.type();
+
+        System.out.println("=================");
+        System.out.println(String.format("%s: %f", dataType, ((Double) event.data()).doubleValue()));
+        System.out.println("=================");
+
+        String action = data.containsKey(ACTION) ? data.get(ACTION) : "NONE";
+        if (action.equals("NONE") ||
+                (action.equals("BUY") && dataType == MarketDataType.ASK_PRICE) ||
+                (action.equals("SELL") && dataType == MarketDataType.BID_PRICE)) {
+            display.asyncExec(() -> textLimitPrice.setText(event.data().toString()));
+        }
     }
 
     public static void main(String[] args) {
         ApplicationContext context = new AnnotationConfigApplicationContext(IBClientConfig.class);
 
-        IBClientMain ibClientMain = (IBClientMain) context.getBean(IBClientMain.class);
+        IBClientMain ibClientMain = context.getBean(IBClientMain.class);
 
         ibClientMain.startWatching();
         Shell shell = ibClientMain.open(display);
@@ -101,7 +125,7 @@ public class IBClientMain {
     public Shell open(Display display) {
         marketDataEventBus.register(this);
 
-        Shell shell = new Shell(display);
+        Shell shell = new Shell(display, SWT.CLOSE | SWT.MIN | SWT.TITLE);
 
         shell.setLayout(new GridLayout());
 
@@ -220,13 +244,13 @@ public class IBClientMain {
                 Label label = new Label(tradeGroup, SWT.NONE);
                 label.setText("Limit price: ");
 
-                Text text = new Text(tradeGroup, SWT.BORDER);
+                textLimitPrice = new Text(tradeGroup, SWT.BORDER);
 
                 GridData gridData = new GridData(100, SWT.DEFAULT);
                 gridData.horizontalSpan = 2;
                 gridData.horizontalAlignment = SWT.LEFT;
-                text.setLayoutData(gridData);
-                text.addModifyListener(getModifyListener(PRICE));
+                textLimitPrice.setLayoutData(gridData);
+                textLimitPrice.addModifyListener(getModifyListener(PRICE));
             }
 
             {
@@ -249,12 +273,19 @@ public class IBClientMain {
                             data.get(EXCHANGE),
                             data.get(ACTION)));
 
-                    ibActions.placeFutureOrder(data.get(SYMBOL),
-                            data.get(MONTH),
-                            data.get(EXCHANGE),
-                            data.get(ACTION),
-                            Double.parseDouble(data.get(PRICE)),
-                            Double.parseDouble(data.get(TRAILING_STOP_AMOUNT)));
+                    try {
+                        int orderId = Integer.parseInt(data.get(NEXT_ORDER_ID));
+                        ibActions.placeFutureOrder(orderId, data.get(SYMBOL),
+                                data.get(MONTH),
+                                data.get(EXCHANGE),
+                                data.get(ACTION),
+                                Double.parseDouble(data.get(PRICE)),
+                                Double.parseDouble(data.get(TRAILING_STOP_AMOUNT)));
+
+                        data.put(NEXT_ORDER_ID, String.valueOf(orderId + 2));
+                    } catch (Exception ex) {
+
+                    }
                 }));
             }
         }

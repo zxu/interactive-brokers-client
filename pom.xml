@@ -16,6 +16,7 @@
         <tws-api.version>9.72.17-SNAPSHOT</tws-api.version>
         <guava.version>23.0</guava.version>
         <junit.version>4.12</junit.version>
+        <logback-classic.version>1.2.3</logback-classic.version>
     </properties>
 
     <dependencies>
@@ -45,6 +46,11 @@
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
             <version>${guava.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>${logback-classic.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework</groupId>

@@ -7,11 +7,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.Set;
 
-//! [ewrapperimpl]
 @Component
 public class EWrapperImpl implements EWrapper {
-    //! [ewrapperimpl]
-
     @Autowired
     private EventBus marketDataEventBus;
 
@@ -149,6 +146,8 @@ public class EWrapperImpl implements EWrapper {
     public void nextValidId(int orderId) {
         System.out.println("Next Valid Id: [" + orderId + "]");
         currentOrderId = orderId;
+
+        marketDataEventBus.post(MarketDataEvent.nextOrderIdEvent(orderId));
     }
     //! [nextvalidid]
 
@@ -334,7 +333,7 @@ public class EWrapperImpl implements EWrapper {
 
     //! [displaygroupupdated]
     public void error(Exception e) {
-        System.out.println("Exception: " + e.getMessage());
+        System.out.println("Exception in EWrapper: " + e.getMessage());
     }
 
     public void error(String str) {

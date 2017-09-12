@@ -7,7 +7,7 @@ public interface IBActions {
 
     void disconnect();
 
-    void placeFutureOrder(String symbol,
+    void placeFutureOrder(int orderId, String symbol,
                           String contractMonth,
                           String exchange,
                           String action,

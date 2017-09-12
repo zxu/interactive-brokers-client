@@ -8,11 +8,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 
 @Component
 public class IBActionsImpl implements IBActions {
     @Autowired
     private EWrapperImpl wrapper;
+
+    @Autowired
+    private ExecutorService executor;
 
     private Map<String, String> data = new ConcurrentHashMap<>();
 
@@ -31,18 +35,18 @@ public class IBActionsImpl implements IBActions {
         final EReader reader = new EReader(client, signal);
 
         reader.start();
-        new Thread() {
-            public void run() {
-                while (client.isConnected()) {
-                    signal.waitForSignal();
-                    try {
-                        reader.processMsgs();
-                    } catch (Exception e) {
-                        System.out.println("Exception: " + e.getMessage());
-                    }
+        executor.execute(() -> {
+            while (client.isConnected()) {
+                System.out.println("==== Waiting for a signal... ====");
+                signal.waitForSignal();
+                System.out.println("==== A signal has arrived ====");
+                try {
+                    reader.processMsgs();
+                } catch (Exception e) {
+                    System.out.println("Exception in IB message loop: " + e.getMessage());
                 }
             }
-        }.start();
+        });
 
         try {
             Thread.sleep(1000);
@@ -58,10 +62,12 @@ public class IBActionsImpl implements IBActions {
     public void disconnect() {
         final EClientSocket client = wrapper.getClient();
         client.eDisconnect();
+
+        wrapper.getSignal().issueSignal();
     }
 
     @Override
-    public void placeFutureOrder(String symbol,
+    public void placeFutureOrder(int orderId, String symbol,
                                  String contractMonth,
                                  String exchange,
                                  String action,
@@ -71,8 +77,7 @@ public class IBActionsImpl implements IBActions {
 
         Contract contract = Contracts.simpleFuture(symbol, contractMonth, exchange);
 
-        client.reqIds(-1);
-        int parentOrderId = wrapper.getCurrentOrderId() + 1;
+        int parentOrderId = orderId;
 
         Order parentOrder = Orders.limitOrder(action, 1, price);
         parentOrder.orderId(parentOrderId);
@@ -99,6 +104,8 @@ public class IBActionsImpl implements IBActions {
     @Override
     public void retrieveMarketData(String symbol, String contractMonth, String exchange) {
         final EClientSocket client = wrapper.getClient();
+
+        client.cancelMktData(1001);
 
         client.reqMktData(1001,
                 Contracts.simpleFuture(symbol, contractMonth, exchange),
