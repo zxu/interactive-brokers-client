@@ -57,8 +57,6 @@ public class IBActionsImpl implements IBActions {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-
-        client.reqIds(-1);
     }
 
     @Override

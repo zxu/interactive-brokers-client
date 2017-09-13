@@ -38,6 +38,7 @@ public class IBClientMain {
     private static final String PRICE = "Price";
     private static final String TRAILING_STOP_AMOUNT = "TrailingStopAmount";
     private static final String NEXT_ORDER_ID = "NextOrderId";
+    private static final String LINKED = "LINKED";
 
     @Autowired
     private IBActions ibActions;
@@ -99,6 +100,10 @@ public class IBClientMain {
     }
 
     private void updateTickPrice(final MarketDataEvent event) {
+        if (!Boolean.parseBoolean(data.get(LINKED))) {
+            return;
+        }
+
         MarketDataType dataType = event.type();
 
         logger.info("===========================");
@@ -109,7 +114,7 @@ public class IBClientMain {
         if (action.equals("NONE") ||
                 (action.equals("BUY") && dataType == MarketDataType.ASK_PRICE) ||
                 (action.equals("SELL") && dataType == MarketDataType.BID_PRICE)) {
-            display.asyncExec(() -> textLimitPrice.setText(event.data().toString()));
+            display.asyncExec(() -> textLimitPrice.setText(String.format("%.6f", (Double) event.data())));
         }
     }
 
@@ -245,16 +250,38 @@ public class IBClientMain {
             }
 
             {
+                Label separator = new Label(tradeGroup, SWT.HORIZONTAL | SWT.SEPARATOR);
+                GridData gridData = new GridData(GridData.FILL_HORIZONTAL);
+                gridData.horizontalSpan = 3;
+                separator.setLayoutData(gridData);
+            }
+
+            {
                 Label label = new Label(tradeGroup, SWT.NONE);
                 label.setText("Limit price: ");
 
                 textLimitPrice = new Text(tradeGroup, SWT.BORDER);
 
                 GridData gridData = new GridData(100, SWT.DEFAULT);
-                gridData.horizontalSpan = 2;
                 gridData.horizontalAlignment = SWT.LEFT;
                 textLimitPrice.setLayoutData(gridData);
                 textLimitPrice.addModifyListener(getModifyListener(PRICE));
+            }
+
+            {
+                Button checkBox = new Button(tradeGroup,SWT.CHECK);
+                checkBox.setText("Linked");
+                GridData gridData = new GridData();
+                gridData.horizontalIndent = 5;
+                checkBox.setLayoutData(gridData);
+                checkBox.addSelectionListener(widgetSelectedAdapter(e -> {
+                    Button button = (Button) e.getSource();
+
+                    data.put(LINKED, Boolean.toString(button.getSelection()));
+                }));
+
+                checkBox.setSelection(true);
+                data.put(LINKED, Boolean.toString(true));
             }
 
             {
