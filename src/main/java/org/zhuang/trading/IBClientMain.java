@@ -9,6 +9,8 @@ import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.layout.RowLayout;
 import org.eclipse.swt.widgets.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -25,6 +27,8 @@ import static org.eclipse.swt.events.SelectionListener.widgetSelectedAdapter;
 
 @Component
 public class IBClientMain {
+    private final static Logger logger = LoggerFactory.getLogger(IBClientMain.class);
+
     private static final Display display = new Display();
 
     private static final String SYMBOL = "Symbol";
@@ -87,9 +91,9 @@ public class IBClientMain {
     private void updateNextOrderId(MarketDataEvent event) {
         MarketDataType dataType = event.type();
 
-        System.out.println("=================");
-        System.out.println(String.format("%s: %d", dataType, (Integer) event.data()));
-        System.out.println("=================");
+        logger.info("===========================");
+        logger.info(String.format("%s: %d", dataType, (Integer) event.data()));
+        logger.info("===========================");
 
         data.put(NEXT_ORDER_ID, event.data().toString());
     }
@@ -97,9 +101,9 @@ public class IBClientMain {
     private void updateTickPrice(final MarketDataEvent event) {
         MarketDataType dataType = event.type();
 
-        System.out.println("=================");
-        System.out.println(String.format("%s: %f", dataType, ((Double) event.data()).doubleValue()));
-        System.out.println("=================");
+        logger.info("===========================");
+        logger.info(String.format("%s: %f", dataType, ((Double) event.data()).doubleValue()));
+        logger.info("===========================");
 
         String action = data.containsKey(ACTION) ? data.get(ACTION) : "NONE";
         if (action.equals("NONE") ||
@@ -267,7 +271,7 @@ public class IBClientMain {
                 button.setText("Place Order");
                 button.setLayoutData(new GridData(120, SWT.DEFAULT));
                 button.addSelectionListener(widgetSelectedAdapter(e -> {
-                    System.out.println(String.format("%s %s @ %s - %s",
+                    logger.info(String.format("%s %s @ %s - %s",
                             data.get(SYMBOL),
                             data.get(MONTH),
                             data.get(EXCHANGE),

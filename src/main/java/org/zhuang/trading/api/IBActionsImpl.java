@@ -1,6 +1,8 @@
 package org.zhuang.trading.api;
 
 import com.ib.client.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -12,6 +14,8 @@ import java.util.concurrent.ExecutorService;
 
 @Component
 public class IBActionsImpl implements IBActions {
+    private final static Logger logger = LoggerFactory.getLogger(IBActionsImpl.class);
+
     @Autowired
     private EWrapperImpl wrapper;
 
@@ -37,13 +41,13 @@ public class IBActionsImpl implements IBActions {
         reader.start();
         executor.execute(() -> {
             while (client.isConnected()) {
-                System.out.println("==== Waiting for a signal... ====");
+                logger.info("Waiting for a signal...");
                 signal.waitForSignal();
-                System.out.println("==== A signal has arrived ====");
+                logger.info("A signal has arrived");
                 try {
                     reader.processMsgs();
                 } catch (Exception e) {
-                    System.out.println("Exception in IB message loop: " + e.getMessage());
+                    logger.error("Exception in IB message loop: " + e.getMessage());
                 }
             }
         });
@@ -55,7 +59,6 @@ public class IBActionsImpl implements IBActions {
         }
 
         client.reqIds(-1);
-        System.out.println(wrapper.getCurrentOrderId());
     }
 
     @Override

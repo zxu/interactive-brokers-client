@@ -28,7 +28,8 @@ public class Orders {
     }
 
     //! [bracket]
-    public static List<Order> bracketOrder(int parentOrderId, String action, double quantity, double limitPrice, double takeProfitLimitPrice, double stopLossPrice) {
+    public static List<Order> bracketOrder(int parentOrderId, String action, double quantity, double limitPrice,
+                                           double takeProfitLimitPrice, double stopLossPrice) {
         //This will be our main or "parent" order
         Order parent = new Order();
         parent.orderId(parentOrderId);
@@ -36,7 +37,8 @@ public class Orders {
         parent.orderType("LMT");
         parent.totalQuantity(quantity);
         parent.lmtPrice(limitPrice);
-        //The parent and children com.trading.test.orders will need this attribute set to false to prevent accidental executions.
+        //The parent and children com.trading.test.orders will need this attribute set to false
+        // to prevent accidental executions.
         //The LAST CHILD will have it set to true.
         parent.transmit(false);
 
@@ -57,7 +59,8 @@ public class Orders {
         stopLoss.auxPrice(stopLossPrice);
         stopLoss.totalQuantity(quantity);
         stopLoss.parentId(parentOrderId);
-        //In this case, the low side order will be the last child being sent. Therefore, it needs to set this attribute to true
+        //In this case, the low side order will be the last child being sent. Therefore,
+        // it needs to set this attribute to true
         //to activate all its predecessors
         stopLoss.transmit(true);
 
@@ -106,7 +109,8 @@ public class Orders {
         return order;
     }
 
-    public static Order trailingStopLimit(String action, double quantity, double trailingAmount, double trailStopPrice, double limitPrice) {
+    public static Order trailingStopLimit(String action, double quantity, double trailingAmount,
+                                          double trailStopPrice, double limitPrice) {
         // ! [trailingstoplimit]
         Order order = new Order();
         order.action(action);
