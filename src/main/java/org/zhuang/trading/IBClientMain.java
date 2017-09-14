@@ -2,6 +2,7 @@ package org.zhuang.trading;
 
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.ModifyEvent;
@@ -20,6 +21,8 @@ import org.zhuang.trading.api.IBActions;
 import org.zhuang.trading.api.MarketDataEvent;
 import org.zhuang.trading.api.MarketDataType;
 
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Map;
 import java.util.concurrent.*;
 
@@ -58,9 +61,16 @@ public class IBClientMain {
     private Group tradeGroup;
     private Label connectionStatusLabel;
     private Button connectionButton;
+    private Text textLimitPrice;
 
     private Map<String, String> data = new ConcurrentHashMap<>();
-    private Text textLimitPrice;
+    private static Map<String, String> defaultValues = new ConcurrentHashMap<>();
+
+    static {
+        defaultValues.put(SYMBOL, "NQ");
+        defaultValues.put(MONTH, new SimpleDateFormat("yyyyMM").format(Calendar.getInstance().getTime()));
+        defaultValues.put(EXCHANGE, "GLOBEX");
+    }
 
     private void startWatching() {
         final Runnable checker = () -> display.asyncExec(() -> {
@@ -210,6 +220,7 @@ public class IBClientMain {
                 gridData.horizontalSpan = 2;
                 gridData.horizontalAlignment = SWT.LEFT;
                 text.setLayoutData(gridData);
+                addFocusListeners(text, SYMBOL);
                 text.addModifyListener(getModifyListener(SYMBOL));
             }
 
@@ -223,6 +234,7 @@ public class IBClientMain {
                 gridData.horizontalSpan = 2;
                 gridData.horizontalAlignment = SWT.LEFT;
                 text.setLayoutData(gridData);
+                addFocusListeners(text, MONTH);
                 text.addModifyListener(getModifyListener(MONTH));
             }
 
@@ -235,6 +247,7 @@ public class IBClientMain {
                 GridData gridData = new GridData(100, SWT.DEFAULT);
                 gridData.horizontalAlignment = SWT.LEFT;
                 text.setLayoutData(gridData);
+                addFocusListeners(text, EXCHANGE);
                 text.addModifyListener(getModifyListener(EXCHANGE));
             }
 
@@ -266,6 +279,7 @@ public class IBClientMain {
                 GridData gridData = new GridData(100, SWT.DEFAULT);
                 gridData.horizontalAlignment = SWT.LEFT;
                 textLimitPrice.setLayoutData(gridData);
+                addFocusListeners(textLimitPrice, PRICE);
                 textLimitPrice.addModifyListener(getModifyListener(PRICE));
             }
 
@@ -291,6 +305,7 @@ public class IBClientMain {
 
                 Text text = new Text(tradeGroup, SWT.BORDER);
                 text.setLayoutData(new GridData(100, SWT.DEFAULT));
+                addFocusListeners(text, TRAILING_STOP_AMOUNT);
                 text.addModifyListener(getModifyListener(TRAILING_STOP_AMOUNT));
             }
 
@@ -358,6 +373,80 @@ public class IBClientMain {
             public void modifyText(ModifyEvent modifyEvent) {
                 String text = ((Text) modifyEvent.widget).getText();
                 data.put(label, text);
+            }
+        };
+    }
+
+    // See https://stackoverflow.com/a/10048884
+    private void addFocusListeners(Widget widget, String field) {
+        if (!(widget instanceof Text)) {
+            return;
+        }
+
+        Text text = (Text) widget;
+
+        Listener listener = getFocusListener(field);
+
+        text.addListener(SWT.FocusIn, listener);
+        text.addListener(SWT.FocusOut, listener);
+        text.addListener(SWT.MouseDown, listener);
+        text.addListener(SWT.MouseUp, listener);
+    }
+
+    private Listener getFocusListener(String field) {
+        return new Listener() {
+            private boolean hasFocus = false;
+            private boolean hadFocusOnMousedown = false;
+
+            @Override
+            public void handleEvent(Event e) {
+                switch (e.type) {
+                    case SWT.FocusIn: {
+                        Text t = (Text) e.widget;
+
+                        if (StringUtils.isAllEmpty(t.getText()) &&
+                                defaultValues.get(field) != null) {
+                            t.setText(defaultValues.get(field));
+                        }
+
+                        // Covers the case where the user focuses by keyboard.
+                        t.selectAll();
+
+                        // The case where the user focuses by mouse click is special because Eclipse,
+                        // for some reason, fires SWT.FocusIn before SWT.MouseDown, and on mouse down
+                        // it cancels the selection. So we set a variable to keep track of whether the
+                        // control is focused (can't rely on isFocusControl() because sometimes it's wrong),
+                        // and we make it asynchronous so it will get set AFTER SWT.MouseDown is fired.
+                        t.getDisplay().asyncExec(new Runnable() {
+                            @Override
+                            public void run() {
+                                hasFocus = true;
+                            }
+                        });
+
+                        break;
+                    }
+                    case SWT.FocusOut: {
+                        hasFocus = false;
+                        ((Text) e.widget).clearSelection();
+
+                        break;
+                    }
+                    case SWT.MouseDown: {
+                        // Set the variable which is used in SWT.MouseUp.
+                        hadFocusOnMousedown = hasFocus;
+
+                        break;
+                    }
+                    case SWT.MouseUp: {
+                        Text t = (Text) e.widget;
+                        if (t.getSelectionCount() == 0 && !hadFocusOnMousedown) {
+                            ((Text) e.widget).selectAll();
+                        }
+
+                        break;
+                    }
+                }
             }
         };
     }
