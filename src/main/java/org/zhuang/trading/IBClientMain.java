@@ -2,6 +2,7 @@ package org.zhuang.trading;
 
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
@@ -269,7 +270,7 @@ public class IBClientMain {
             }
 
             {
-                Button checkBox = new Button(tradeGroup,SWT.CHECK);
+                Button checkBox = new Button(tradeGroup, SWT.CHECK);
                 checkBox.setText("Linked");
                 GridData gridData = new GridData();
                 gridData.horizontalIndent = 5;
@@ -306,14 +307,19 @@ public class IBClientMain {
 
                     try {
                         int orderId = Integer.parseInt(data.get(NEXT_ORDER_ID));
+
+                        double price = NumberUtils.isCreatable(data.get(PRICE)) ?
+                                NumberUtils.createDouble(data.get(PRICE)) : -1;
+                        double trailingStopAmount = NumberUtils.isCreatable(data.get(TRAILING_STOP_AMOUNT)) ?
+                                NumberUtils.createDouble(data.get(TRAILING_STOP_AMOUNT)) : -1;
+
                         ibActions.placeFutureOrder(orderId, data.get(SYMBOL),
                                 data.get(MONTH),
                                 data.get(EXCHANGE),
                                 data.get(ACTION),
-                                Double.parseDouble(data.get(PRICE)),
-                                Double.parseDouble(data.get(TRAILING_STOP_AMOUNT)));
+                                price,
+                                trailingStopAmount);
 
-                        data.put(NEXT_ORDER_ID, String.valueOf(orderId + 2));
                     } catch (Exception ex) {
 
                     }

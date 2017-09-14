@@ -1,5 +1,6 @@
 package org.zhuang.trading.api;
 
+import com.google.common.eventbus.EventBus;
 import com.ib.client.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +23,8 @@ public class IBActionsImpl implements IBActions {
     @Autowired
     private ExecutorService executor;
 
-    private Map<String, String> data = new ConcurrentHashMap<>();
+    @Autowired
+    private EventBus marketDataEventBus;
 
     @Override
     public boolean isConnected() {
@@ -78,24 +80,32 @@ public class IBActionsImpl implements IBActions {
 
         Contract contract = Contracts.simpleFuture(symbol, contractMonth, exchange);
 
-        int parentOrderId = orderId;
-
-        Order parentOrder = Orders.limitOrder(action, 1, price);
-        parentOrder.orderId(parentOrderId);
-        parentOrder.transmit(false);
-
-        Order trailingStopOrder = Orders.trailingStop(reverse(action), trailingStopAmount, 1);
-        trailingStopOrder.orderId(parentOrder.orderId() + 1);
-        trailingStopOrder.parentId(parentOrderId);
-        trailingStopOrder.transmit(true);
 
         List<Order> orders = new ArrayList<>();
+
+        int parentOrderId = orderId;
+        Order parentOrder = Orders.limitOrder(action, 1, price);
+        parentOrder.orderId(parentOrderId);
+        parentOrder.transmit(true);
+
         orders.add(parentOrder);
-        orders.add(trailingStopOrder);
+
+        if (trailingStopAmount > 0) {
+            Order trailingStopOrder = Orders.trailingStop(reverse(action), trailingStopAmount, 1);
+            trailingStopOrder.orderId(parentOrder.orderId() + 1);
+            trailingStopOrder.parentId(parentOrderId);
+            trailingStopOrder.transmit(true);
+
+            parentOrder.transmit(false);
+
+            orders.add(trailingStopOrder);
+        }
 
         orders.forEach(order -> {
             client.placeOrder(order.orderId(), contract, order);
         });
+
+        marketDataEventBus.post(MarketDataEvent.nextOrderIdEvent(orderId + orders.size()));
     }
 
     private String reverse(String action) {
@@ -113,9 +123,5 @@ public class IBActionsImpl implements IBActions {
                 "",
                 false,
                 null);
-    }
-
-    public Map<String, String> getData() {
-        return data;
     }
 }
