@@ -7,9 +7,7 @@ import org.apache.commons.lang3.math.NumberUtils;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
-import org.eclipse.swt.layout.GridData;
-import org.eclipse.swt.layout.GridLayout;
-import org.eclipse.swt.layout.RowLayout;
+import org.eclipse.swt.layout.*;
 import org.eclipse.swt.widgets.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,9 +38,12 @@ public class IBClientMain {
     private static final String EXCHANGE = "Exchange";
     private static final String ACTION = "Action";
     private static final String PRICE = "Price";
+    private static final String BID_PRICE = "Bid_Price";
+    private static final String ASK_PRICE = "Ask_Price";
     private static final String TRAILING_STOP_AMOUNT = "TrailingStopAmount";
     private static final String NEXT_ORDER_ID = "NextOrderId";
     private static final String LINKED = "LINKED";
+    private static final String MID = "MID";
 
     @Autowired
     private IBActions ibActions;
@@ -62,6 +63,8 @@ public class IBClientMain {
     private Label connectionStatusLabel;
     private Button connectionButton;
     private Text textLimitPrice;
+    private Label labelPriceBid;
+    private Label labelPriceAsk;
 
     private Map<String, String> data = new ConcurrentHashMap<>();
     private static Map<String, String> defaultValues = new ConcurrentHashMap<>();
@@ -92,7 +95,9 @@ public class IBClientMain {
     @Subscribe
     public void marketEventHandler(MarketDataEvent event) {
         MarketDataType dataType = event.type();
-        if (dataType == MarketDataType.BID_PRICE || dataType == MarketDataType.ASK_PRICE) {
+        if (dataType == MarketDataType.BID_PRICE
+                || dataType == MarketDataType.ASK_PRICE
+                || dataType == MarketDataType.UPDATE_UI_PRICE) {
             updateTickPrice(event);
         }
         if (dataType == MarketDataType.NEXT_ORDER_ID) {
@@ -111,21 +116,68 @@ public class IBClientMain {
     }
 
     private void updateTickPrice(final MarketDataEvent event) {
+        MarketDataType dataType = event.type();
+
+        logger.info("===========================");
+        logger.info(String.format("%s: %f", dataType, (Double) event.data()));
+        logger.info("===========================");
+
+        if (dataType == MarketDataType.BID_PRICE) {
+            data.put(BID_PRICE, event.data().toString());
+            display.asyncExec(() -> {
+                labelPriceBid.setText(String.format("Bid: %.4f", (Double) event.data()));
+                tradeGroup.layout();
+            });
+        }
+
+        if (dataType == MarketDataType.ASK_PRICE) {
+            data.put(ASK_PRICE, event.data().toString());
+            display.asyncExec(() -> {
+                labelPriceAsk.setText(String.format("Ask: %.4f", (Double) event.data()));
+                tradeGroup.layout();
+            });
+        }
+
         if (!Boolean.parseBoolean(data.get(LINKED))) {
             return;
         }
 
-        MarketDataType dataType = event.type();
-
-        logger.info("===========================");
-        logger.info(String.format("%s: %f", dataType, ((Double) event.data()).doubleValue()));
-        logger.info("===========================");
-
         String action = data.containsKey(ACTION) ? data.get(ACTION) : "NONE";
-        if (action.equals("NONE") ||
-                (action.equals("BUY") && dataType == MarketDataType.ASK_PRICE) ||
-                (action.equals("SELL") && dataType == MarketDataType.BID_PRICE)) {
-            display.asyncExec(() -> textLimitPrice.setText(String.format("%.6f", (Double) event.data())));
+
+        if (action.equals("NONE")) {
+            return;
+        }
+
+        if (Boolean.parseBoolean(data.get(MID))) {
+            if (!(data.containsKey(BID_PRICE) && data.containsKey(ASK_PRICE))) {
+                return;
+            }
+            double bidPrice = Double.parseDouble(data.get(BID_PRICE));
+            double askPrice = Double.parseDouble(data.get(ASK_PRICE));
+            double midPrice = (bidPrice + askPrice) / 2;
+
+            display.asyncExec(() -> {
+                textLimitPrice.setText(String.format("%.4f", midPrice));
+                tradeGroup.layout();
+            });
+        } else {
+            if (action.equals("BUY")) {
+                if (!data.containsKey(ASK_PRICE)) {
+                    return;
+                }
+                display.asyncExec(() -> {
+                    textLimitPrice.setText(String.format("%.4f", Double.parseDouble(data.get(ASK_PRICE))));
+                    tradeGroup.layout();
+                });
+            } else {
+                if (!data.containsKey(BID_PRICE)) {
+                    return;
+                }
+                display.asyncExec(() -> {
+                    textLimitPrice.setText(String.format("%.4f", Double.parseDouble(data.get(BID_PRICE))));
+                    tradeGroup.layout();
+                });
+            }
         }
     }
 
@@ -180,7 +232,7 @@ public class IBClientMain {
          * Set up the "trade" region of the UI
          */
         {
-            GridLayout gridLayout = new GridLayout(3, false);
+            GridLayout gridLayout = new GridLayout(4, false);
 
             tradeGroup = new Group(shell, SWT.NONE);
             tradeGroup.setLayout(gridLayout);
@@ -190,34 +242,13 @@ public class IBClientMain {
             tradeGroup.setEnabled(false);
 
             {
-                Composite composite = new Composite(tradeGroup, SWT.NONE);
-                GridData gridData = new GridData();
-                gridData.horizontalSpan = 3;
-                gridData.horizontalAlignment = SWT.LEFT;
-                composite.setLayoutData(gridData);
-                composite.setLayout(createRowLayout());
-
-                Button buyButton = new Button(composite, SWT.RADIO);
-                buyButton.setText(" Buy");
-                buyButton.addSelectionListener(widgetSelectedAdapter(e -> {
-                    data.put(ACTION, "BUY");
-                }));
-
-                Button sellButton = new Button(composite, SWT.RADIO);
-                sellButton.setText(" Sell");
-                sellButton.addSelectionListener(widgetSelectedAdapter(e -> {
-                    data.put(ACTION, "SELL");
-                }));
-            }
-
-            {
                 Label label = new Label(tradeGroup, SWT.NONE);
                 label.setText("Symbol: ");
 
                 Text text = new Text(tradeGroup, SWT.BORDER);
 
                 GridData gridData = new GridData(100, SWT.DEFAULT);
-                gridData.horizontalSpan = 2;
+                gridData.horizontalSpan = 3;
                 gridData.horizontalAlignment = SWT.LEFT;
                 text.setLayoutData(gridData);
                 addFocusListeners(text, SYMBOL);
@@ -231,7 +262,7 @@ public class IBClientMain {
                 Text text = new Text(tradeGroup, SWT.BORDER);
 
                 GridData gridData = new GridData(100, SWT.DEFAULT);
-                gridData.horizontalSpan = 2;
+                gridData.horizontalSpan = 3;
                 gridData.horizontalAlignment = SWT.LEFT;
                 text.setLayoutData(gridData);
                 addFocusListeners(text, MONTH);
@@ -254,7 +285,11 @@ public class IBClientMain {
             {
                 Button button = new Button(tradeGroup, SWT.PUSH);
                 button.setText("Retrieve Price");
-                button.setLayoutData(new GridData(120, SWT.DEFAULT));
+
+                GridData gridData = new GridData(160, SWT.DEFAULT);
+                gridData.horizontalSpan = 2;
+                gridData.horizontalAlignment = SWT.LEFT;
+                button.setLayoutData(gridData);
 
                 button.addSelectionListener(widgetSelectedAdapter(e -> {
                     ibActions.retrieveMarketData(data.get(SYMBOL),
@@ -266,8 +301,60 @@ public class IBClientMain {
             {
                 Label separator = new Label(tradeGroup, SWT.HORIZONTAL | SWT.SEPARATOR);
                 GridData gridData = new GridData(GridData.FILL_HORIZONTAL);
-                gridData.horizontalSpan = 3;
+                gridData.horizontalSpan = 4;
                 separator.setLayoutData(gridData);
+            }
+
+            {
+                Composite composite = new Composite(tradeGroup, SWT.NONE);
+                GridData gridData = new GridData();
+                gridData.horizontalSpan = 4;
+                gridData.horizontalAlignment = SWT.LEFT;
+                composite.setLayoutData(gridData);
+                composite.setLayout(createRowLayout());
+
+                Button buyButton = new Button(composite, SWT.RADIO);
+                buyButton.setText(" Buy");
+                buyButton.addSelectionListener(widgetSelectedAdapter(e -> {
+                    data.put(ACTION, "BUY");
+                    if (data.containsKey(ASK_PRICE)) {
+                        marketDataEventBus.post(MarketDataEvent.updateUIPriceEvent(0));
+                    }
+                }));
+
+                Button sellButton = new Button(composite, SWT.RADIO);
+                sellButton.setText(" Sell");
+                sellButton.addSelectionListener(widgetSelectedAdapter(e -> {
+                    data.put(ACTION, "SELL");
+                    if (data.containsKey(BID_PRICE)) {
+                        marketDataEventBus.post(MarketDataEvent.updateUIPriceEvent(0));
+                    }
+                }));
+
+                {
+                    Label separator = new Label(composite, SWT.SPACE);
+                    RowData rowData = new RowData(40, 20);
+                    separator.setLayoutData(rowData);
+
+                    FormLayout gridLayoutPrices = new FormLayout();
+                    Composite compositePrices = new Composite(composite, SWT.NONE);
+                    compositePrices.setLayout(gridLayoutPrices);
+
+                    FormData formDataBid = new FormData();
+                    formDataBid.left = new FormAttachment(0, 0);
+                    formDataBid.top = new FormAttachment(0, 0);
+
+                    labelPriceBid = new Label(compositePrices, SWT.NONE);
+                    labelPriceBid.setText("");
+                    labelPriceBid.setLayoutData(formDataBid);
+
+                    FormData formDataAsk = new FormData();
+                    formDataAsk.left = new FormAttachment(55, 0);
+
+                    labelPriceAsk = new Label(compositePrices, SWT.NONE);
+                    labelPriceAsk.setText("");
+                    labelPriceAsk.setLayoutData(formDataAsk);
+                }
             }
 
             {
@@ -284,19 +371,40 @@ public class IBClientMain {
             }
 
             {
-                Button checkBox = new Button(tradeGroup, SWT.CHECK);
-                checkBox.setText("Linked");
+                Composite composite = new Composite(tradeGroup, SWT.NONE);
                 GridData gridData = new GridData();
-                gridData.horizontalIndent = 5;
-                checkBox.setLayoutData(gridData);
-                checkBox.addSelectionListener(widgetSelectedAdapter(e -> {
-                    Button button = (Button) e.getSource();
+                gridData.horizontalSpan = 2;
+                gridData.horizontalAlignment = SWT.LEFT;
+                composite.setLayoutData(gridData);
+                composite.setLayout(createRowLayout());
+                {
 
-                    data.put(LINKED, Boolean.toString(button.getSelection()));
-                }));
+                    Button checkBox = new Button(composite, SWT.CHECK);
+                    checkBox.setText("Linked");
+                    checkBox.addSelectionListener(widgetSelectedAdapter(e -> {
+                        Button button = (Button) e.getSource();
 
-                checkBox.setSelection(true);
-                data.put(LINKED, Boolean.toString(true));
+                        data.put(LINKED, Boolean.toString(button.getSelection()));
+                    }));
+
+                    checkBox.setSelection(true);
+                    data.put(LINKED, Boolean.toString(true));
+                }
+
+                {
+                    Button checkBox = new Button(composite, SWT.CHECK);
+                    checkBox.setText("Mid-point");
+                    checkBox.addSelectionListener(widgetSelectedAdapter(e -> {
+                        Button button = (Button) e.getSource();
+
+                        data.put(MID, Boolean.toString(button.getSelection()));
+
+                        marketDataEventBus.post(MarketDataEvent.updateUIPriceEvent(0));
+                    }));
+
+                    checkBox.setSelection(false);
+                    data.put(MID, Boolean.toString(false));
+                }
             }
 
             {
@@ -312,7 +420,7 @@ public class IBClientMain {
             {
                 Button button = new Button(tradeGroup, SWT.PUSH);
                 button.setText("Place Order");
-                button.setLayoutData(new GridData(120, SWT.DEFAULT));
+                button.setLayoutData(new GridData(160, SWT.DEFAULT));
                 button.addSelectionListener(widgetSelectedAdapter(e -> {
                     logger.info(String.format("%s %s @ %s - %s",
                             data.get(SYMBOL),
@@ -335,7 +443,7 @@ public class IBClientMain {
                                 price,
                                 trailingStopAmount);
 
-                    } catch (Exception ex) {
+                    } catch (Exception ignored) {
 
                     }
                 }));

@@ -21,6 +21,10 @@ public class MarketDataEvent {
         return new MarketDataEvent(MarketDataType.NEXT_ORDER_ID, Integer.valueOf(id));
     }
 
+    public static MarketDataEvent updateUIPriceEvent(double price) {
+        return new MarketDataEvent(MarketDataType.UPDATE_UI_PRICE, Double.valueOf(price));
+    }
+
     public MarketDataType type() {
         return type;
     }
