@@ -2,6 +2,7 @@ package org.zhuang.trading;
 
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
+import com.ib.client.ContractDetails;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.eclipse.swt.SWT;
@@ -19,10 +20,11 @@ import org.zhuang.trading.api.IBActions;
 import org.zhuang.trading.api.MarketDataEvent;
 import org.zhuang.trading.api.MarketDataType;
 
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.eclipse.swt.events.SelectionListener.widgetSelectedAdapter;
@@ -33,23 +35,11 @@ public class IBClientMain {
 
     private static final Display display = new Display();
 
-    private static final String SYMBOL = "Symbol";
-    private static final String MONTH = "Month";
-    private static final String EXCHANGE = "Exchange";
-    private static final String ACTION = "Action";
-    private static final String PRICE = "Price";
-    private static final String BID_PRICE = "Bid_Price";
-    private static final String ASK_PRICE = "Ask_Price";
-    private static final String TRAILING_STOP_AMOUNT = "TrailingStopAmount";
-    private static final String NEXT_ORDER_ID = "NextOrderId";
-    private static final String LINKED = "LINKED";
-    private static final String MID = "MID";
-
     @Autowired
     private IBActions ibActions;
 
     @Autowired
-    private EventBus marketDataEventBus;
+    private EventBus eventBus;
 
     @Autowired
     private ExecutorService executor;
@@ -66,14 +56,11 @@ public class IBClientMain {
     private Label labelPriceBid;
     private Label labelPriceAsk;
 
-    private Map<String, String> data = new ConcurrentHashMap<>();
-    private static Map<String, String> defaultValues = new ConcurrentHashMap<>();
+    @Autowired
+    private Map<String, String> data;
 
-    static {
-        defaultValues.put(SYMBOL, "NQ");
-        defaultValues.put(MONTH, new SimpleDateFormat("yyyyMM").format(Calendar.getInstance().getTime()));
-        defaultValues.put(EXCHANGE, "GLOBEX");
-    }
+    @Autowired
+    private Map<String, String> defaultValues;
 
     private void startWatching() {
         final Runnable checker = () -> display.asyncExec(() -> {
@@ -103,6 +90,20 @@ public class IBClientMain {
         if (dataType == MarketDataType.NEXT_ORDER_ID) {
             updateNextOrderId(event);
         }
+        if (dataType == MarketDataType.CONTRACT_DETAILS) {
+            receiveContractDetails(event);
+        }
+        if (dataType == MarketDataType.PRICE_INCREMENT) {
+            receivePriceIncrement(event);
+        }
+    }
+
+    private void receivePriceIncrement(MarketDataEvent event) {
+        data.put(Constants.PRICE_INCREMENT, String.valueOf(event.data()));
+    }
+
+    private void receiveContractDetails(MarketDataEvent event) {
+        ibActions.retrieveMarketRules(((ContractDetails)event.data()).marketRuleIds());
     }
 
     private void updateNextOrderId(MarketDataEvent event) {
@@ -112,7 +113,7 @@ public class IBClientMain {
         logger.info(String.format("%s: %d", dataType, (Integer) event.data()));
         logger.info("===========================");
 
-        data.put(NEXT_ORDER_ID, event.data().toString());
+        data.put(Constants.NEXT_ORDER_ID, event.data().toString());
     }
 
     private void updateTickPrice(final MarketDataEvent event) {
@@ -123,7 +124,7 @@ public class IBClientMain {
         logger.info("===========================");
 
         if (dataType == MarketDataType.BID_PRICE) {
-            data.put(BID_PRICE, event.data().toString());
+            data.put(Constants.BID_PRICE, event.data().toString());
             display.asyncExec(() -> {
                 labelPriceBid.setText(String.format("Bid: %.4f", (Double) event.data()));
                 tradeGroup.layout();
@@ -131,29 +132,29 @@ public class IBClientMain {
         }
 
         if (dataType == MarketDataType.ASK_PRICE) {
-            data.put(ASK_PRICE, event.data().toString());
+            data.put(Constants.ASK_PRICE, event.data().toString());
             display.asyncExec(() -> {
                 labelPriceAsk.setText(String.format("Ask: %.4f", (Double) event.data()));
                 tradeGroup.layout();
             });
         }
 
-        if (!Boolean.parseBoolean(data.get(LINKED))) {
+        if (!Boolean.parseBoolean(data.get(Constants.LINKED))) {
             return;
         }
 
-        String action = data.containsKey(ACTION) ? data.get(ACTION) : "NONE";
+        String action = data.containsKey(Constants.ACTION) ? data.get(Constants.ACTION) : "NONE";
 
         if (action.equals("NONE")) {
             return;
         }
 
-        if (Boolean.parseBoolean(data.get(MID))) {
-            if (!(data.containsKey(BID_PRICE) && data.containsKey(ASK_PRICE))) {
+        if (Boolean.parseBoolean(data.get(Constants.MID))) {
+            if (!(data.containsKey(Constants.BID_PRICE) && data.containsKey(Constants.ASK_PRICE))) {
                 return;
             }
-            double bidPrice = Double.parseDouble(data.get(BID_PRICE));
-            double askPrice = Double.parseDouble(data.get(ASK_PRICE));
+            double bidPrice = Double.parseDouble(data.get(Constants.BID_PRICE));
+            double askPrice = Double.parseDouble(data.get(Constants.ASK_PRICE));
             double midPrice = (bidPrice + askPrice) / 2;
 
             display.asyncExec(() -> {
@@ -162,19 +163,19 @@ public class IBClientMain {
             });
         } else {
             if (action.equals("BUY")) {
-                if (!data.containsKey(ASK_PRICE)) {
+                if (!data.containsKey(Constants.ASK_PRICE)) {
                     return;
                 }
                 display.asyncExec(() -> {
-                    textLimitPrice.setText(String.format("%.4f", Double.parseDouble(data.get(ASK_PRICE))));
+                    textLimitPrice.setText(String.format("%.4f", Double.parseDouble(data.get(Constants.ASK_PRICE))));
                     tradeGroup.layout();
                 });
             } else {
-                if (!data.containsKey(BID_PRICE)) {
+                if (!data.containsKey(Constants.BID_PRICE)) {
                     return;
                 }
                 display.asyncExec(() -> {
-                    textLimitPrice.setText(String.format("%.4f", Double.parseDouble(data.get(BID_PRICE))));
+                    textLimitPrice.setText(String.format("%.4f", Double.parseDouble(data.get(Constants.BID_PRICE))));
                     tradeGroup.layout();
                 });
             }
@@ -195,7 +196,7 @@ public class IBClientMain {
     }
 
     public Shell open(Display display) {
-        marketDataEventBus.register(this);
+        eventBus.register(this);
 
         Shell shell = new Shell(display, SWT.CLOSE | SWT.MIN | SWT.TITLE);
 
@@ -251,8 +252,8 @@ public class IBClientMain {
                 gridData.horizontalSpan = 3;
                 gridData.horizontalAlignment = SWT.LEFT;
                 text.setLayoutData(gridData);
-                addFocusListeners(text, SYMBOL);
-                text.addModifyListener(getModifyListener(SYMBOL));
+                addFocusListeners(text, Constants.SYMBOL);
+                text.addModifyListener(getModifyListener(Constants.SYMBOL));
             }
 
             {
@@ -265,8 +266,8 @@ public class IBClientMain {
                 gridData.horizontalSpan = 3;
                 gridData.horizontalAlignment = SWT.LEFT;
                 text.setLayoutData(gridData);
-                addFocusListeners(text, MONTH);
-                text.addModifyListener(getModifyListener(MONTH));
+                addFocusListeners(text, Constants.MONTH);
+                text.addModifyListener(getModifyListener(Constants.MONTH));
             }
 
             {
@@ -278,8 +279,8 @@ public class IBClientMain {
                 GridData gridData = new GridData(100, SWT.DEFAULT);
                 gridData.horizontalAlignment = SWT.LEFT;
                 text.setLayoutData(gridData);
-                addFocusListeners(text, EXCHANGE);
-                text.addModifyListener(getModifyListener(EXCHANGE));
+                addFocusListeners(text, Constants.EXCHANGE);
+                text.addModifyListener(getModifyListener(Constants.EXCHANGE));
             }
 
             {
@@ -292,9 +293,9 @@ public class IBClientMain {
                 button.setLayoutData(gridData);
 
                 button.addSelectionListener(widgetSelectedAdapter(e -> {
-                    ibActions.retrieveMarketData(data.get(SYMBOL),
-                            data.get(MONTH),
-                            data.get(EXCHANGE));
+                    ibActions.retrieveMarketData(data.get(Constants.SYMBOL),
+                            data.get(Constants.MONTH),
+                            data.get(Constants.EXCHANGE));
                 }));
             }
 
@@ -316,18 +317,18 @@ public class IBClientMain {
                 Button buyButton = new Button(composite, SWT.RADIO);
                 buyButton.setText(" Buy");
                 buyButton.addSelectionListener(widgetSelectedAdapter(e -> {
-                    data.put(ACTION, "BUY");
-                    if (data.containsKey(ASK_PRICE)) {
-                        marketDataEventBus.post(MarketDataEvent.updateUIPriceEvent(0));
+                    data.put(Constants.ACTION, "BUY");
+                    if (data.containsKey(Constants.ASK_PRICE)) {
+                        eventBus.post(MarketDataEvent.updateUIPriceEvent(0));
                     }
                 }));
 
                 Button sellButton = new Button(composite, SWT.RADIO);
                 sellButton.setText(" Sell");
                 sellButton.addSelectionListener(widgetSelectedAdapter(e -> {
-                    data.put(ACTION, "SELL");
-                    if (data.containsKey(BID_PRICE)) {
-                        marketDataEventBus.post(MarketDataEvent.updateUIPriceEvent(0));
+                    data.put(Constants.ACTION, "SELL");
+                    if (data.containsKey(Constants.BID_PRICE)) {
+                        eventBus.post(MarketDataEvent.updateUIPriceEvent(0));
                     }
                 }));
 
@@ -366,8 +367,8 @@ public class IBClientMain {
                 GridData gridData = new GridData(100, SWT.DEFAULT);
                 gridData.horizontalAlignment = SWT.LEFT;
                 textLimitPrice.setLayoutData(gridData);
-                addFocusListeners(textLimitPrice, PRICE);
-                textLimitPrice.addModifyListener(getModifyListener(PRICE));
+                addFocusListeners(textLimitPrice, Constants.PRICE);
+                textLimitPrice.addModifyListener(getModifyListener(Constants.PRICE));
             }
 
             {
@@ -384,11 +385,13 @@ public class IBClientMain {
                     checkBox.addSelectionListener(widgetSelectedAdapter(e -> {
                         Button button = (Button) e.getSource();
 
-                        data.put(LINKED, Boolean.toString(button.getSelection()));
+                        data.put(Constants.LINKED, Boolean.toString(button.getSelection()));
+
+                        eventBus.post(MarketDataEvent.updateUIPriceEvent(0));
                     }));
 
                     checkBox.setSelection(true);
-                    data.put(LINKED, Boolean.toString(true));
+                    data.put(Constants.LINKED, Boolean.toString(true));
                 }
 
                 {
@@ -397,13 +400,13 @@ public class IBClientMain {
                     checkBox.addSelectionListener(widgetSelectedAdapter(e -> {
                         Button button = (Button) e.getSource();
 
-                        data.put(MID, Boolean.toString(button.getSelection()));
+                        data.put(Constants.MID, Boolean.toString(button.getSelection()));
 
-                        marketDataEventBus.post(MarketDataEvent.updateUIPriceEvent(0));
+                        eventBus.post(MarketDataEvent.updateUIPriceEvent(0));
                     }));
 
                     checkBox.setSelection(false);
-                    data.put(MID, Boolean.toString(false));
+                    data.put(Constants.MID, Boolean.toString(false));
                 }
             }
 
@@ -413,8 +416,8 @@ public class IBClientMain {
 
                 Text text = new Text(tradeGroup, SWT.BORDER);
                 text.setLayoutData(new GridData(100, SWT.DEFAULT));
-                addFocusListeners(text, TRAILING_STOP_AMOUNT);
-                text.addModifyListener(getModifyListener(TRAILING_STOP_AMOUNT));
+                addFocusListeners(text, Constants.TRAILING_STOP_AMOUNT);
+                text.addModifyListener(getModifyListener(Constants.TRAILING_STOP_AMOUNT));
             }
 
             {
@@ -423,23 +426,23 @@ public class IBClientMain {
                 button.setLayoutData(new GridData(160, SWT.DEFAULT));
                 button.addSelectionListener(widgetSelectedAdapter(e -> {
                     logger.info(String.format("%s %s @ %s - %s",
-                            data.get(SYMBOL),
-                            data.get(MONTH),
-                            data.get(EXCHANGE),
-                            data.get(ACTION)));
+                            data.get(Constants.SYMBOL),
+                            data.get(Constants.MONTH),
+                            data.get(Constants.EXCHANGE),
+                            data.get(Constants.ACTION)));
 
                     try {
-                        int orderId = Integer.parseInt(data.get(NEXT_ORDER_ID));
+                        int orderId = Integer.parseInt(data.get(Constants.NEXT_ORDER_ID));
 
-                        double price = NumberUtils.isCreatable(data.get(PRICE)) ?
-                                NumberUtils.createDouble(data.get(PRICE)) : -1;
-                        double trailingStopAmount = NumberUtils.isCreatable(data.get(TRAILING_STOP_AMOUNT)) ?
-                                NumberUtils.createDouble(data.get(TRAILING_STOP_AMOUNT)) : -1;
+                        double price = NumberUtils.isCreatable(data.get(Constants.PRICE)) ?
+                                NumberUtils.createDouble(data.get(Constants.PRICE)) : -1;
+                        double trailingStopAmount = NumberUtils.isCreatable(data.get(Constants.TRAILING_STOP_AMOUNT)) ?
+                                NumberUtils.createDouble(data.get(Constants.TRAILING_STOP_AMOUNT)) : -1;
 
-                        ibActions.placeFutureOrder(orderId, data.get(SYMBOL),
-                                data.get(MONTH),
-                                data.get(EXCHANGE),
-                                data.get(ACTION),
+                        ibActions.placeFutureOrder(orderId, data.get(Constants.SYMBOL),
+                                data.get(Constants.MONTH),
+                                data.get(Constants.EXCHANGE),
+                                data.get(Constants.ACTION),
                                 price,
                                 trailingStopAmount);
 

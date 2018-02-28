@@ -15,4 +15,6 @@ public interface IBActions {
                           double trailingStopAmount);
 
     void retrieveMarketData(String symbol, String contractMonth, String exchange);
+
+    void retrieveMarketRules(String marketRulesIds);
 }

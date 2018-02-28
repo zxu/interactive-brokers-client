@@ -2,6 +2,7 @@ package org.zhuang.trading.api;
 
 import com.google.common.eventbus.EventBus;
 import com.ib.client.*;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,8 +10,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 
 @Component
@@ -24,7 +23,7 @@ public class IBActionsImpl implements IBActions {
     private ExecutorService executor;
 
     @Autowired
-    private EventBus marketDataEventBus;
+    private EventBus eventBus;
 
     @Override
     public boolean isConnected() {
@@ -105,7 +104,7 @@ public class IBActionsImpl implements IBActions {
             client.placeOrder(order.orderId(), contract, order);
         });
 
-        marketDataEventBus.post(MarketDataEvent.nextOrderIdEvent(orderId + orders.size()));
+        eventBus.post(MarketDataEvent.nextOrderIdEvent(orderId + orders.size()));
     }
 
     private String reverse(String action) {
@@ -118,10 +117,25 @@ public class IBActionsImpl implements IBActions {
 
         client.cancelMktData(1001);
 
+        Contract contract = Contracts.simpleFuture(symbol, contractMonth, exchange);
+
+        client.reqContractDetails(100101, contract);
+
         client.reqMktData(1001,
-                Contracts.simpleFuture(symbol, contractMonth, exchange),
+                contract,
                 "",
                 false,
+                false,
                 null);
+    }
+
+    @Override
+    public void retrieveMarketRules(String marketRulesIds) {
+        final EClientSocket client = wrapper.getClient();
+
+        String[] ruleIds = StringUtils.split(marketRulesIds, ',');
+        for (String ruleId:ruleIds) {
+            client.reqMarketRule(Integer.parseInt(ruleId));
+        }
     }
 }
