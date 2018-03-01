@@ -21,7 +21,6 @@ import org.zhuang.trading.api.IBActions;
 import org.zhuang.trading.api.MarketDataEvent;
 import org.zhuang.trading.api.MarketDataType;
 
-import javax.swing.*;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
