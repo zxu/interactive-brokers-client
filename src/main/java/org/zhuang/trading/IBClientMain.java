@@ -16,10 +16,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.stereotype.Component;
+import org.zhuang.trading.api.Direction;
 import org.zhuang.trading.api.IBActions;
 import org.zhuang.trading.api.MarketDataEvent;
 import org.zhuang.trading.api.MarketDataType;
 
+import javax.swing.*;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -143,9 +145,9 @@ public class IBClientMain {
             return;
         }
 
-        String action = data.containsKey(Constants.ACTION) ? data.get(Constants.ACTION) : "NONE";
+        Direction direction = Direction.valueOf(data.containsKey(Constants.ACTION) ? data.get(Constants.ACTION) : "NONE");
 
-        if (action.equals("NONE")) {
+        if (direction.equals(Direction.NONE)) {
             return;
         }
 
@@ -153,16 +155,18 @@ public class IBClientMain {
             if (!(data.containsKey(Constants.BID_PRICE) && data.containsKey(Constants.ASK_PRICE))) {
                 return;
             }
-            double bidPrice = Double.parseDouble(data.get(Constants.BID_PRICE));
-            double askPrice = Double.parseDouble(data.get(Constants.ASK_PRICE));
-            double midPrice = (bidPrice + askPrice) / 2;
+
+            double midPrice = Helper.midPointPrice(Double.parseDouble(data.get(Constants.BID_PRICE)),
+                    Double.parseDouble(data.get(Constants.ASK_PRICE)),
+                    Double.parseDouble(data.get(Constants.PRICE_INCREMENT)),
+                    direction);
 
             display.asyncExec(() -> {
                 textLimitPrice.setText(String.format("%.4f", midPrice));
                 tradeGroup.layout();
             });
         } else {
-            if (action.equals("BUY")) {
+            if (direction.equals(Direction.BUY.name())) {
                 if (!data.containsKey(Constants.ASK_PRICE)) {
                     return;
                 }
@@ -317,7 +321,7 @@ public class IBClientMain {
                 Button buyButton = new Button(composite, SWT.RADIO);
                 buyButton.setText(" Buy");
                 buyButton.addSelectionListener(widgetSelectedAdapter(e -> {
-                    data.put(Constants.ACTION, "BUY");
+                    data.put(Constants.ACTION, Direction.BUY.name());
                     if (data.containsKey(Constants.ASK_PRICE)) {
                         eventBus.post(MarketDataEvent.updateUIPriceEvent(0));
                     }
@@ -326,7 +330,7 @@ public class IBClientMain {
                 Button sellButton = new Button(composite, SWT.RADIO);
                 sellButton.setText(" Sell");
                 sellButton.addSelectionListener(widgetSelectedAdapter(e -> {
-                    data.put(Constants.ACTION, "SELL");
+                    data.put(Constants.ACTION, Direction.SELL.name());
                     if (data.containsKey(Constants.BID_PRICE)) {
                         eventBus.post(MarketDataEvent.updateUIPriceEvent(0));
                     }
@@ -561,4 +565,5 @@ public class IBClientMain {
             }
         };
     }
+
 }
