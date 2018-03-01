@@ -141,6 +141,8 @@ public class EWrapperImpl implements EWrapper {
                 lastFillPrice,
                 clientId,
                 whyHeld));
+
+        eventBus.post(MarketDataEvent.orderStatusEvent(status));
     }
 
     @Override

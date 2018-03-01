@@ -5,6 +5,7 @@ public enum MarketDataType {
     ASK_PRICE,
     CONTRACT_DETAILS,
     PRICE_INCREMENT,
+    ORDER_STATUS,
     NEXT_ORDER_ID,
     UPDATE_UI_PRICE
 }

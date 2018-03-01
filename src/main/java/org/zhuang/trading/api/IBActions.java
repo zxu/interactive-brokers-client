@@ -17,4 +17,6 @@ public interface IBActions {
     void retrieveMarketData(String symbol, String contractMonth, String exchange);
 
     void retrieveMarketRules(String marketRulesIds);
+
+    void retrievePositions();
 }

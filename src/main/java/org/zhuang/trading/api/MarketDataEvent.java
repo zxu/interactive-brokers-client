@@ -35,6 +35,10 @@ public class MarketDataEvent {
         return new MarketDataEvent(MarketDataType.PRICE_INCREMENT, price);
     }
 
+    public static MarketDataEvent orderStatusEvent(String status) {
+        return new MarketDataEvent(MarketDataType.ORDER_STATUS, status);
+    }
+
     public MarketDataType type() {
         return type;
     }

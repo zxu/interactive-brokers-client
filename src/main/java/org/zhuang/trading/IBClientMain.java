@@ -97,6 +97,13 @@ public class IBClientMain {
         if (dataType == MarketDataType.PRICE_INCREMENT) {
             receivePriceIncrement(event);
         }
+        if (dataType == MarketDataType.ORDER_STATUS) {
+            receiveOrderStatus(event);
+        }
+    }
+
+    private void receiveOrderStatus(MarketDataEvent event) {
+        ibActions.retrievePositions();
     }
 
     private void receivePriceIncrement(MarketDataEvent event) {

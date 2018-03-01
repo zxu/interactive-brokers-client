@@ -138,4 +138,11 @@ public class IBActionsImpl implements IBActions {
             client.reqMarketRule(Integer.parseInt(ruleId));
         }
     }
+
+    @Override
+    public void retrievePositions() {
+        final EClientSocket client = wrapper.getClient();
+
+        client.reqPositions();
+    }
 }
