@@ -172,7 +172,7 @@ public class IBClientMain {
                 tradeGroup.layout();
             });
         } else {
-            if (direction.equals(Direction.BUY.name())) {
+            if (direction.equals(Direction.BUY)) {
                 if (!data.containsKey(Constants.ASK_PRICE)) {
                     return;
                 }
