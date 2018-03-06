@@ -74,7 +74,8 @@ public class IBActionsImpl implements IBActions {
                                  String exchange,
                                  String action,
                                  double price,
-                                 double trailingStopAmount) {
+                                 double trailingStopAmount,
+                                 int quantity) {
         final EClientSocket client = wrapper.getClient();
 
         Contract contract = Contracts.simpleFuture(symbol, contractMonth, exchange);
@@ -83,14 +84,14 @@ public class IBActionsImpl implements IBActions {
         List<Order> orders = new ArrayList<>();
 
         int parentOrderId = orderId;
-        Order parentOrder = Orders.limitOrder(action, 1, price);
+        Order parentOrder = Orders.limitOrder(action, quantity, price);
         parentOrder.orderId(parentOrderId);
         parentOrder.transmit(true);
 
         orders.add(parentOrder);
 
         if (trailingStopAmount > 0) {
-            Order trailingStopOrder = Orders.trailingStop(reverse(action), trailingStopAmount, 1);
+            Order trailingStopOrder = Orders.trailingStop(reverse(action), trailingStopAmount, quantity);
             trailingStopOrder.orderId(parentOrder.orderId() + 1);
             trailingStopOrder.parentId(parentOrderId);
             trailingStopOrder.transmit(true);
@@ -134,7 +135,7 @@ public class IBActionsImpl implements IBActions {
         final EClientSocket client = wrapper.getClient();
 
         String[] ruleIds = StringUtils.split(marketRulesIds, ',');
-        for (String ruleId:ruleIds) {
+        for (String ruleId : ruleIds) {
             client.reqMarketRule(Integer.parseInt(ruleId));
         }
     }

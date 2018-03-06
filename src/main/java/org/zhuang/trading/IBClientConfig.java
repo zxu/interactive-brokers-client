@@ -25,6 +25,7 @@ public class IBClientConfig {
         defaultValues.put(Constants.SYMBOL, "NQ");
         defaultValues.put(Constants.MONTH, new SimpleDateFormat("yyyyMM").format(Calendar.getInstance().getTime()));
         defaultValues.put(Constants.EXCHANGE, "GLOBEX");
+        defaultValues.put(Constants.QUANTITY, "1");
     }
 
     @Bean(name = "marketDataEventBus")
@@ -38,12 +39,12 @@ public class IBClientConfig {
     }
 
     @Bean(name = "data")
-    public Map<String, String> data () {
+    public Map<String, String> data() {
         return data;
     }
 
     @Bean(name = "defaultValues")
-    public Map<String, String> defaultValues () {
+    public Map<String, String> defaultValues() {
         return defaultValues;
     }
 }

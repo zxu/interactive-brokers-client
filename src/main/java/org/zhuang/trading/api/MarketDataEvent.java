@@ -2,6 +2,8 @@ package org.zhuang.trading.api;
 
 import com.ib.client.ContractDetails;
 
+import java.util.Map;
+
 public class MarketDataEvent {
     public MarketDataEvent(MarketDataType type, Object data) {
         this.type = type;
@@ -37,6 +39,10 @@ public class MarketDataEvent {
 
     public static MarketDataEvent orderStatusEvent(String status) {
         return new MarketDataEvent(MarketDataType.ORDER_STATUS, status);
+    }
+
+    public static MarketDataEvent positionEvent(Map<String, Object> position) {
+        return new MarketDataEvent(MarketDataType.POSITION, position);
     }
 
     public MarketDataType type() {

@@ -12,7 +12,8 @@ public interface IBActions {
                           String exchange,
                           String action,
                           double price,
-                          double trailingStopAmount);
+                          double trailingStopAmount,
+                          int quantity);
 
     void retrieveMarketData(String symbol, String contractMonth, String exchange);
 

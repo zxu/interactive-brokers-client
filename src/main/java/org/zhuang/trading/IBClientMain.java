@@ -6,7 +6,6 @@ import com.ib.client.ContractDetails;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.layout.*;
 import org.eclipse.swt.widgets.*;
@@ -21,6 +20,7 @@ import org.zhuang.trading.api.IBActions;
 import org.zhuang.trading.api.MarketDataEvent;
 import org.zhuang.trading.api.MarketDataType;
 
+import javax.annotation.Resource;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -50,23 +50,25 @@ public class IBClientMain {
 
     private ScheduledFuture<?> checkConnection;
 
-    private Group tradeGroup;
+    private Group orderGroup;
     private Label connectionStatusLabel;
     private Button connectionButton;
     private Text textLimitPrice;
     private Label labelPriceBid;
     private Label labelPriceAsk;
 
-    @Autowired
+    @Resource(name = "data")
     private Map<String, String> data;
 
-    @Autowired
+    @Resource(name = "defaultValues")
     private Map<String, String> defaultValues;
+
+    private TableItem positionTableItem;
 
     private void startWatching() {
         final Runnable checker = () -> display.asyncExec(() -> {
             boolean connected = ibActions.isConnected();
-            tradeGroup.setEnabled(connected);
+            orderGroup.setEnabled(connected);
             connectionStatusLabel.setText(connected ? "Connected" : "Disconnected");
             connectionButton.setText(connected ? "Disconnect" : "Connect");
         });
@@ -100,6 +102,22 @@ public class IBClientMain {
         if (dataType == MarketDataType.ORDER_STATUS) {
             receiveOrderStatus(event);
         }
+        if (dataType == MarketDataType.POSITION) {
+            receivePosition(event);
+        }
+    }
+
+    private void receivePosition(MarketDataEvent event) {
+        Map<String, Object> position = (Map<String, Object>) event.data();
+
+        if (!position.get(Constants.SYMBOL).equals(data.get(Constants.SYMBOL))) {
+            return;
+        }
+
+        display.asyncExec(() -> positionTableItem.setText(new String[]{
+                String.valueOf(position.get(Constants.SYMBOL)),
+                String.format("%.0f", position.get(Constants.POSITION)),
+                String.format("%,.2f", position.get(Constants.COST))}));
     }
 
     private void receiveOrderStatus(MarketDataEvent event) {
@@ -111,14 +129,14 @@ public class IBClientMain {
     }
 
     private void receiveContractDetails(MarketDataEvent event) {
-        ibActions.retrieveMarketRules(((ContractDetails)event.data()).marketRuleIds());
+        ibActions.retrieveMarketRules(((ContractDetails) event.data()).marketRuleIds());
     }
 
     private void updateNextOrderId(MarketDataEvent event) {
         MarketDataType dataType = event.type();
 
         logger.info("===========================");
-        logger.info(String.format("%s: %d", dataType, (Integer) event.data()));
+        logger.info(String.format("%s: %d", dataType, event.data()));
         logger.info("===========================");
 
         data.put(Constants.NEXT_ORDER_ID, event.data().toString());
@@ -128,14 +146,14 @@ public class IBClientMain {
         MarketDataType dataType = event.type();
 
         logger.info("===========================");
-        logger.info(String.format("%s: %f", dataType, (Double) event.data()));
+        logger.info(String.format("%s: %f", dataType, event.data()));
         logger.info("===========================");
 
         if (dataType == MarketDataType.BID_PRICE) {
             data.put(Constants.BID_PRICE, event.data().toString());
             display.asyncExec(() -> {
                 labelPriceBid.setText(String.format("Bid: %.4f", (Double) event.data()));
-                tradeGroup.layout();
+                orderGroup.layout();
             });
         }
 
@@ -143,7 +161,7 @@ public class IBClientMain {
             data.put(Constants.ASK_PRICE, event.data().toString());
             display.asyncExec(() -> {
                 labelPriceAsk.setText(String.format("Ask: %.4f", (Double) event.data()));
-                tradeGroup.layout();
+                orderGroup.layout();
             });
         }
 
@@ -169,7 +187,7 @@ public class IBClientMain {
 
             display.asyncExec(() -> {
                 textLimitPrice.setText(String.format("%.4f", midPrice));
-                tradeGroup.layout();
+                orderGroup.layout();
             });
         } else {
             if (direction.equals(Direction.BUY)) {
@@ -178,7 +196,7 @@ public class IBClientMain {
                 }
                 display.asyncExec(() -> {
                     textLimitPrice.setText(String.format("%.4f", Double.parseDouble(data.get(Constants.ASK_PRICE))));
-                    tradeGroup.layout();
+                    orderGroup.layout();
                 });
             } else {
                 if (!data.containsKey(Constants.BID_PRICE)) {
@@ -186,7 +204,7 @@ public class IBClientMain {
                 }
                 display.asyncExec(() -> {
                     textLimitPrice.setText(String.format("%.4f", Double.parseDouble(data.get(Constants.BID_PRICE))));
-                    tradeGroup.layout();
+                    orderGroup.layout();
                 });
             }
         }
@@ -205,20 +223,23 @@ public class IBClientMain {
         display.dispose();
     }
 
-    public Shell open(Display display) {
+    private Shell open(Display display) {
         eventBus.register(this);
 
         Shell shell = new Shell(display, SWT.CLOSE | SWT.MIN | SWT.TITLE);
 
-        shell.setLayout(new GridLayout());
+        shell.setLayout(new GridLayout(2, false));
 
-        /**
-         * Set up the "connection" region of the UI
+        Composite leftPane = new Composite(shell, SWT.NONE);
+        leftPane.setLayout(new GridLayout());
+
+        /*
+          Set up the "connection" region of the UI
          */
         {
             GridLayout gridLayout = new GridLayout(2, false);
 
-            Group group = new Group(shell, SWT.NONE);
+            Group group = new Group(leftPane, SWT.NONE);
             group.setLayout(gridLayout);
             group.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
             group.setText("Connection");
@@ -239,24 +260,24 @@ public class IBClientMain {
             }));
         }
 
-        /**
-         * Set up the "trade" region of the UI
+        /*
+          Set up the "trade" region of the UI
          */
         {
             GridLayout gridLayout = new GridLayout(4, false);
 
-            tradeGroup = new Group(shell, SWT.NONE);
-            tradeGroup.setLayout(gridLayout);
-            tradeGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
-            tradeGroup.setText("Trade");
+            orderGroup = new Group(leftPane, SWT.NONE);
+            orderGroup.setLayout(gridLayout);
+            orderGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+            orderGroup.setText("Order");
 
-            tradeGroup.setEnabled(false);
+            orderGroup.setEnabled(false);
 
             {
-                Label label = new Label(tradeGroup, SWT.NONE);
+                Label label = new Label(orderGroup, SWT.NONE);
                 label.setText("Symbol: ");
 
-                Text text = new Text(tradeGroup, SWT.BORDER);
+                Text text = new Text(orderGroup, SWT.BORDER);
 
                 GridData gridData = new GridData(100, SWT.DEFAULT);
                 gridData.horizontalSpan = 3;
@@ -267,10 +288,10 @@ public class IBClientMain {
             }
 
             {
-                Label label = new Label(tradeGroup, SWT.NONE);
+                Label label = new Label(orderGroup, SWT.NONE);
                 label.setText("Contract month: ");
 
-                Text text = new Text(tradeGroup, SWT.BORDER);
+                Text text = new Text(orderGroup, SWT.BORDER);
 
                 GridData gridData = new GridData(100, SWT.DEFAULT);
                 gridData.horizontalSpan = 3;
@@ -281,10 +302,10 @@ public class IBClientMain {
             }
 
             {
-                Label label = new Label(tradeGroup, SWT.NONE);
+                Label label = new Label(orderGroup, SWT.NONE);
                 label.setText("Exchange: ");
 
-                Text text = new Text(tradeGroup, SWT.BORDER);
+                Text text = new Text(orderGroup, SWT.BORDER);
 
                 GridData gridData = new GridData(100, SWT.DEFAULT);
                 gridData.horizontalAlignment = SWT.LEFT;
@@ -294,7 +315,7 @@ public class IBClientMain {
             }
 
             {
-                Button button = new Button(tradeGroup, SWT.PUSH);
+                Button button = new Button(orderGroup, SWT.PUSH);
                 button.setText("Retrieve Price");
 
                 GridData gridData = new GridData(160, SWT.DEFAULT);
@@ -302,22 +323,20 @@ public class IBClientMain {
                 gridData.horizontalAlignment = SWT.LEFT;
                 button.setLayoutData(gridData);
 
-                button.addSelectionListener(widgetSelectedAdapter(e -> {
-                    ibActions.retrieveMarketData(data.get(Constants.SYMBOL),
-                            data.get(Constants.MONTH),
-                            data.get(Constants.EXCHANGE));
-                }));
+                button.addSelectionListener(widgetSelectedAdapter(e -> ibActions.retrieveMarketData(data.get(Constants.SYMBOL),
+                        data.get(Constants.MONTH),
+                        data.get(Constants.EXCHANGE))));
             }
 
             {
-                Label separator = new Label(tradeGroup, SWT.HORIZONTAL | SWT.SEPARATOR);
+                Label separator = new Label(orderGroup, SWT.HORIZONTAL | SWT.SEPARATOR);
                 GridData gridData = new GridData(GridData.FILL_HORIZONTAL);
                 gridData.horizontalSpan = 4;
                 separator.setLayoutData(gridData);
             }
 
             {
-                Composite composite = new Composite(tradeGroup, SWT.NONE);
+                Composite composite = new Composite(orderGroup, SWT.NONE);
                 GridData gridData = new GridData();
                 gridData.horizontalSpan = 4;
                 gridData.horizontalAlignment = SWT.LEFT;
@@ -369,10 +388,24 @@ public class IBClientMain {
             }
 
             {
-                Label label = new Label(tradeGroup, SWT.NONE);
+                Label label = new Label(orderGroup, SWT.NONE);
+                label.setText("Quantity: ");
+
+                Text textQuantity = new Text(orderGroup, SWT.BORDER);
+
+                GridData gridData = new GridData(100, SWT.DEFAULT);
+                gridData.horizontalAlignment = SWT.LEFT;
+                gridData.horizontalSpan = 3;
+                textQuantity.setLayoutData(gridData);
+                addFocusListeners(textQuantity, Constants.QUANTITY);
+                textQuantity.addModifyListener(getModifyListener(Constants.QUANTITY));
+            }
+
+            {
+                Label label = new Label(orderGroup, SWT.NONE);
                 label.setText("Limit price: ");
 
-                textLimitPrice = new Text(tradeGroup, SWT.BORDER);
+                textLimitPrice = new Text(orderGroup, SWT.BORDER);
 
                 GridData gridData = new GridData(100, SWT.DEFAULT);
                 gridData.horizontalAlignment = SWT.LEFT;
@@ -382,7 +415,7 @@ public class IBClientMain {
             }
 
             {
-                Composite composite = new Composite(tradeGroup, SWT.NONE);
+                Composite composite = new Composite(orderGroup, SWT.NONE);
                 GridData gridData = new GridData();
                 gridData.horizontalSpan = 2;
                 gridData.horizontalAlignment = SWT.LEFT;
@@ -421,17 +454,17 @@ public class IBClientMain {
             }
 
             {
-                Label label = new Label(tradeGroup, SWT.NONE);
+                Label label = new Label(orderGroup, SWT.NONE);
                 label.setText("Trailing amount: ");
 
-                Text text = new Text(tradeGroup, SWT.BORDER);
+                Text text = new Text(orderGroup, SWT.BORDER);
                 text.setLayoutData(new GridData(100, SWT.DEFAULT));
                 addFocusListeners(text, Constants.TRAILING_STOP_AMOUNT);
                 text.addModifyListener(getModifyListener(Constants.TRAILING_STOP_AMOUNT));
             }
 
             {
-                Button button = new Button(tradeGroup, SWT.PUSH);
+                Button button = new Button(orderGroup, SWT.PUSH);
                 button.setText("Place Order");
                 button.setLayoutData(new GridData(160, SWT.DEFAULT));
                 button.addSelectionListener(widgetSelectedAdapter(e -> {
@@ -454,7 +487,8 @@ public class IBClientMain {
                                 data.get(Constants.EXCHANGE),
                                 data.get(Constants.ACTION),
                                 price,
-                                trailingStopAmount);
+                                trailingStopAmount,
+                                Integer.parseInt(data.getOrDefault(Constants.QUANTITY, defaultValues.get(Constants.QUANTITY))));
 
                     } catch (Exception ignored) {
 
@@ -463,12 +497,54 @@ public class IBClientMain {
             }
         }
 
+        Composite rightPane = new Composite(shell, SWT.NONE);
+        rightPane.setLayout(new GridLayout());
+        rightPane.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+
+        /*
+          Set up the positions region
+         */
+        {
+            FormLayout formLayout = new FormLayout();
+
+            Group group = new Group(rightPane, SWT.NONE);
+            group.setLayout(formLayout);
+            GridData layoutData = new GridData(SWT.FILL, SWT.FILL, true, true);
+            group.setLayoutData(layoutData);
+            group.setText("Positions");
+
+            Table table = new Table(group, SWT.BORDER);
+
+            TableColumn columnSymbol = new TableColumn(table, SWT.LEFT);
+            TableColumn columnPosition = new TableColumn(table, SWT.RIGHT);
+            TableColumn columnCost = new TableColumn(table, SWT.RIGHT);
+
+            columnSymbol.setText("Symbol");
+            columnPosition.setText("Position");
+            columnCost.setText("Average Cost");
+            columnSymbol.setWidth(100);
+            columnPosition.setWidth(100);
+            columnCost.setWidth(150);
+            table.setHeaderVisible(true);
+
+            positionTableItem = new TableItem(table, SWT.NONE);
+            positionTableItem.setText(new String[]{"", "", ""});
+
+            FormData formData = new FormData();
+            formData.width = 160;
+            formData.height = 40;
+            formData.bottom = new FormAttachment(97, 0);
+            formData.left = new FormAttachment(50, -80);
+
+            Button button = new Button(group, SWT.PUSH);
+            button.setText("Close Out 100%");
+            button.setLayoutData(formData);
+        }
+
         shell.pack();
         shell.open();
 
-        shell.addListener(SWT.Close, event -> {
-            stopWatching();
-        });
+        shell.addListener(SWT.Close, event -> stopWatching());
 
         return shell;
     }
@@ -489,10 +565,12 @@ public class IBClientMain {
     }
 
     private ModifyListener getModifyListener(String label) {
-        return new ModifyListener() {
-            @Override
-            public void modifyText(ModifyEvent modifyEvent) {
-                String text = ((Text) modifyEvent.widget).getText();
+        return modifyEvent -> {
+            String text = ((Text) modifyEvent.widget).getText();
+
+            if (StringUtils.isBlank(text)) {
+                data.remove(label);
+            } else {
                 data.put(label, text);
             }
         };
@@ -538,12 +616,7 @@ public class IBClientMain {
                         // it cancels the selection. So we set a variable to keep track of whether the
                         // control is focused (can't rely on isFocusControl() because sometimes it's wrong),
                         // and we make it asynchronous so it will get set AFTER SWT.MouseDown is fired.
-                        t.getDisplay().asyncExec(new Runnable() {
-                            @Override
-                            public void run() {
-                                hasFocus = true;
-                            }
-                        });
+                        t.getDisplay().asyncExec(() -> hasFocus = true);
 
                         break;
                     }
@@ -571,5 +644,4 @@ public class IBClientMain {
             }
         };
     }
-
 }

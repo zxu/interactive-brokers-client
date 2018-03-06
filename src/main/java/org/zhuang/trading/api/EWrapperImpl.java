@@ -1,11 +1,13 @@
 package org.zhuang.trading.api;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.eventbus.EventBus;
 import com.ib.client.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.zhuang.trading.Constants;
 
 import java.text.DecimalFormat;
 import java.util.List;
@@ -341,6 +343,14 @@ public class EWrapperImpl implements EWrapper {
         logger.info("Position. " + account + " - Symbol: " + contract.symbol() + ", SecType: " +
                 contract.secType() + ", Currency: " + contract.currency() + ", Position: " +
                 pos + ", Avg cost: " + avgCost);
+
+        ImmutableMap<String, Object> position = ImmutableMap.<String, Object>builder()
+                .put(Constants.SYMBOL, contract.symbol())
+                .put(Constants.POSITION, Double.valueOf(pos))
+                .put(Constants.COST, Double.valueOf(avgCost))
+                .build();
+
+        eventBus.post(MarketDataEvent.positionEvent(position));
     }
 
     @Override
