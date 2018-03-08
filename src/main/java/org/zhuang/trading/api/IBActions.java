@@ -13,7 +13,15 @@ public interface IBActions {
                           String action,
                           double price,
                           double trailingStopAmount,
-                          int quantity);
+                          double quantity);
+
+    void placeFutureOrderMarket(int orderId, String symbol,
+                          String contractMonth,
+                          String exchange,
+                          String action,
+                          double quantity);
+
+    void cancelAllOrders();
 
     void retrieveMarketData(String symbol, String contractMonth, String exchange);
 

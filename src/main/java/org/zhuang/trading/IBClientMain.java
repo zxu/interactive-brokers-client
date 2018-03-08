@@ -64,6 +64,7 @@ public class IBClientMain {
     private Map<String, String> defaultValues;
 
     private TableItem positionTableItem;
+    private Button buttonCloseOut;
 
     private void startWatching() {
         final Runnable checker = () -> display.asyncExec(() -> {
@@ -114,10 +115,17 @@ public class IBClientMain {
             return;
         }
 
-        display.asyncExec(() -> positionTableItem.setText(new String[]{
-                String.valueOf(position.get(Constants.SYMBOL)),
-                String.format("%.0f", position.get(Constants.POSITION)),
-                String.format("%,.2f", position.get(Constants.COST))}));
+        double quantity = (double) position.get(Constants.POSITION);
+        data.put(Constants.POSITION, String.valueOf(quantity));
+
+        display.asyncExec(() -> {
+            positionTableItem.setText(new String[]{
+                    String.valueOf(position.get(Constants.SYMBOL)),
+                    String.format("%.0f", quantity),
+                    String.format("%,.2f", position.get(Constants.COST))});
+
+            buttonCloseOut.setEnabled(quantity != 0);
+        });
     }
 
     private void receiveOrderStatus(MarketDataEvent event) {
@@ -152,7 +160,7 @@ public class IBClientMain {
         if (dataType == MarketDataType.BID_PRICE) {
             data.put(Constants.BID_PRICE, event.data().toString());
             display.asyncExec(() -> {
-                labelPriceBid.setText(String.format("Bid: %.4f", (Double) event.data()));
+                labelPriceBid.setText(String.format("Bid: %.2f", (Double) event.data()));
                 orderGroup.layout();
             });
         }
@@ -160,7 +168,7 @@ public class IBClientMain {
         if (dataType == MarketDataType.ASK_PRICE) {
             data.put(Constants.ASK_PRICE, event.data().toString());
             display.asyncExec(() -> {
-                labelPriceAsk.setText(String.format("Ask: %.4f", (Double) event.data()));
+                labelPriceAsk.setText(String.format("Ask: %.2f", (Double) event.data()));
                 orderGroup.layout();
             });
         }
@@ -186,7 +194,7 @@ public class IBClientMain {
                     direction);
 
             display.asyncExec(() -> {
-                textLimitPrice.setText(String.format("%.4f", midPrice));
+                textLimitPrice.setText(String.format("%.2f", midPrice));
                 orderGroup.layout();
             });
         } else {
@@ -195,7 +203,7 @@ public class IBClientMain {
                     return;
                 }
                 display.asyncExec(() -> {
-                    textLimitPrice.setText(String.format("%.4f", Double.parseDouble(data.get(Constants.ASK_PRICE))));
+                    textLimitPrice.setText(String.format("%.2f", Double.parseDouble(data.get(Constants.ASK_PRICE))));
                     orderGroup.layout();
                 });
             } else {
@@ -203,7 +211,7 @@ public class IBClientMain {
                     return;
                 }
                 display.asyncExec(() -> {
-                    textLimitPrice.setText(String.format("%.4f", Double.parseDouble(data.get(Constants.BID_PRICE))));
+                    textLimitPrice.setText(String.format("%.2f", Double.parseDouble(data.get(Constants.BID_PRICE))));
                     orderGroup.layout();
                 });
             }
@@ -371,7 +379,7 @@ public class IBClientMain {
                     compositePrices.setLayout(gridLayoutPrices);
 
                     FormData formDataBid = new FormData();
-                    formDataBid.left = new FormAttachment(0, 0);
+                    formDataBid.left = new FormAttachment(10, 0);
                     formDataBid.top = new FormAttachment(0, 0);
 
                     labelPriceBid = new Label(compositePrices, SWT.NONE);
@@ -379,7 +387,7 @@ public class IBClientMain {
                     labelPriceBid.setLayoutData(formDataBid);
 
                     FormData formDataAsk = new FormData();
-                    formDataAsk.left = new FormAttachment(55, 0);
+                    formDataAsk.left = new FormAttachment(60, 0);
 
                     labelPriceAsk = new Label(compositePrices, SWT.NONE);
                     labelPriceAsk.setText("");
@@ -488,7 +496,7 @@ public class IBClientMain {
                                 data.get(Constants.ACTION),
                                 price,
                                 trailingStopAmount,
-                                Integer.parseInt(data.getOrDefault(Constants.QUANTITY, defaultValues.get(Constants.QUANTITY))));
+                                Double.valueOf(data.getOrDefault(Constants.QUANTITY, defaultValues.get(Constants.QUANTITY))));
 
                     } catch (Exception ignored) {
 
@@ -536,9 +544,33 @@ public class IBClientMain {
             formData.bottom = new FormAttachment(97, 0);
             formData.left = new FormAttachment(50, -80);
 
-            Button button = new Button(group, SWT.PUSH);
-            button.setText("Close Out 100%");
-            button.setLayoutData(formData);
+            buttonCloseOut = new Button(group, SWT.PUSH);
+            buttonCloseOut.setText("Close Out 100%");
+            buttonCloseOut.setLayoutData(formData);
+
+            buttonCloseOut.setEnabled(false);
+
+            buttonCloseOut.addSelectionListener(widgetSelectedAdapter(e -> {
+                try {
+                    Double quantity = Double.valueOf(data.get(Constants.POSITION));
+
+                    if (quantity == 0) return;
+
+                    ibActions.cancelAllOrders();
+
+                    Direction action = quantity > 0 ? Direction.SELL : Direction.BUY;
+                    int orderId = Integer.parseInt(data.get(Constants.NEXT_ORDER_ID));
+
+                    ibActions.placeFutureOrderMarket(orderId, data.get(Constants.SYMBOL),
+                            data.get(Constants.MONTH),
+                            data.get(Constants.EXCHANGE),
+                            action.name(),
+                            quantity);
+
+                } catch (Exception exception) {
+                    logger.error("Closing out error", exception);
+                }
+            }));
         }
 
         shell.pack();

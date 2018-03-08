@@ -75,7 +75,7 @@ public class IBActionsImpl implements IBActions {
                                  String action,
                                  double price,
                                  double trailingStopAmount,
-                                 int quantity) {
+                                 double quantity) {
         final EClientSocket client = wrapper.getClient();
 
         Contract contract = Contracts.simpleFuture(symbol, contractMonth, exchange);
@@ -106,6 +106,28 @@ public class IBActionsImpl implements IBActions {
         });
 
         eventBus.post(MarketDataEvent.nextOrderIdEvent(orderId + orders.size()));
+    }
+
+    @Override
+    public void placeFutureOrderMarket(int orderId, String symbol, String contractMonth, String exchange, String action, double quantity) {
+        final EClientSocket client = wrapper.getClient();
+
+        Contract contract = Contracts.simpleFuture(symbol, contractMonth, exchange);
+
+        Order order = Orders.marketOrder(action, (double)quantity);
+        order.orderId(orderId);
+        order.transmit(true);
+
+        client.placeOrder(order.orderId(), contract, order);
+
+        eventBus.post(MarketDataEvent.nextOrderIdEvent(orderId + 1));
+    }
+
+    @Override
+    public void cancelAllOrders() {
+        final EClientSocket client = wrapper.getClient();
+
+        client.reqGlobalCancel();
     }
 
     private String reverse(String action) {

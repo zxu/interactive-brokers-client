@@ -41,6 +41,7 @@ public class IBClientTest {
     @Test
     public void dataIsAvailable() {
         assertNotNull(data);
+        assertTrue(data.isEmpty());
     }
 
     @Test
