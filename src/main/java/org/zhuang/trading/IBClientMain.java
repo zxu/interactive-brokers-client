@@ -331,9 +331,13 @@ public class IBClientMain {
                 gridData.horizontalAlignment = SWT.LEFT;
                 button.setLayoutData(gridData);
 
-                button.addSelectionListener(widgetSelectedAdapter(e -> ibActions.retrieveMarketData(data.get(Constants.SYMBOL),
-                        data.get(Constants.MONTH),
-                        data.get(Constants.EXCHANGE))));
+                button.addSelectionListener(widgetSelectedAdapter(e -> {
+                    ibActions.retrieveMarketData(data.get(Constants.SYMBOL),
+                            data.get(Constants.MONTH),
+                            data.get(Constants.EXCHANGE));
+
+                    ibActions.retrievePositions();
+                }));
             }
 
             {
@@ -552,7 +556,7 @@ public class IBClientMain {
 
             buttonCloseOut.addSelectionListener(widgetSelectedAdapter(e -> {
                 try {
-                    Double quantity = Double.valueOf(data.get(Constants.POSITION));
+                    double quantity = Double.parseDouble(data.get(Constants.POSITION));
 
                     if (quantity == 0) return;
 
@@ -565,7 +569,7 @@ public class IBClientMain {
                             data.get(Constants.MONTH),
                             data.get(Constants.EXCHANGE),
                             action.name(),
-                            quantity);
+                            Math.abs(quantity));
 
                 } catch (Exception exception) {
                     logger.error("Closing out error", exception);

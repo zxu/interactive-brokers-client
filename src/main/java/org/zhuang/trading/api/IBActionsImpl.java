@@ -114,7 +114,7 @@ public class IBActionsImpl implements IBActions {
 
         Contract contract = Contracts.simpleFuture(symbol, contractMonth, exchange);
 
-        Order order = Orders.marketOrder(action, (double)quantity);
+        Order order = Orders.marketOrder(action, quantity);
         order.orderId(orderId);
         order.transmit(true);
 
