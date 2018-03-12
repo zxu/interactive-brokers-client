@@ -16,10 +16,10 @@ public interface IBActions {
                           double quantity);
 
     void placeFutureOrderMarket(int orderId, String symbol,
-                          String contractMonth,
-                          String exchange,
-                          String action,
-                          double quantity);
+                                String contractMonth,
+                                String exchange,
+                                String action,
+                                double quantity);
 
     void cancelAllOrders();
 

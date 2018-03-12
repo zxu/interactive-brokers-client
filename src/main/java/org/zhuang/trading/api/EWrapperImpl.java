@@ -150,7 +150,7 @@ public class EWrapperImpl implements EWrapper {
     @Override
     public void openOrder(int orderId, Contract contract, Order order,
                           OrderState orderState) {
-        logger.info(String.format("OpenOrder. ID: %d, %s, %s @ %s: %s, %s %d, %s",
+        logger.info(String.format("OpenOrder. ID: %d, %s, %s @ %s: %s, %s %f, %s",
                 orderId,
                 contract.symbol(),
                 contract.secType(),

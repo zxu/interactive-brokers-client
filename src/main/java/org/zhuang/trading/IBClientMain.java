@@ -56,6 +56,7 @@ public class IBClientMain {
     private Text textLimitPrice;
     private Label labelPriceBid;
     private Label labelPriceAsk;
+    Composite rightPane;
 
     @Resource(name = "data")
     private Map<String, String> data;
@@ -70,6 +71,7 @@ public class IBClientMain {
         final Runnable checker = () -> display.asyncExec(() -> {
             boolean connected = ibActions.isConnected();
             orderGroup.setEnabled(connected);
+            rightPane.setEnabled(connected);
             connectionStatusLabel.setText(connected ? "Connected" : "Disconnected");
             connectionButton.setText(connected ? "Disconnect" : "Connect");
         });
@@ -509,7 +511,7 @@ public class IBClientMain {
             }
         }
 
-        Composite rightPane = new Composite(shell, SWT.NONE);
+        rightPane = new Composite(shell, SWT.NONE);
         rightPane.setLayout(new GridLayout());
         rightPane.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
@@ -522,6 +524,7 @@ public class IBClientMain {
             Group group = new Group(rightPane, SWT.NONE);
             group.setLayout(formLayout);
             GridData layoutData = new GridData(SWT.FILL, SWT.FILL, true, true);
+            layoutData.grabExcessVerticalSpace = true;
             group.setLayoutData(layoutData);
             group.setText("Positions");
 
@@ -542,39 +545,63 @@ public class IBClientMain {
             positionTableItem = new TableItem(table, SWT.NONE);
             positionTableItem.setText(new String[]{"", "", ""});
 
-            FormData formData = new FormData();
-            formData.width = 160;
-            formData.height = 40;
-            formData.bottom = new FormAttachment(97, 0);
-            formData.left = new FormAttachment(50, -80);
+            Composite bottomPane = new Composite(rightPane, SWT.NONE);
+            bottomPane.setLayoutData(new GridData(SWT.FILL, SWT.END, true, false));
 
-            buttonCloseOut = new Button(group, SWT.PUSH);
-            buttonCloseOut.setText("Close Out 100%");
-            buttonCloseOut.setLayoutData(formData);
+            RowLayout rowLayout = new RowLayout();
+            rowLayout.wrap = false;
+            rowLayout.pack = true;
+            rowLayout.justify = true;
+            rowLayout.type = SWT.HORIZONTAL;
+            rowLayout.marginLeft = 5;
+            rowLayout.marginTop = 5;
+            rowLayout.marginRight = 5;
+            rowLayout.marginBottom = 5;
+            rowLayout.spacing = 0;
 
-            buttonCloseOut.setEnabled(false);
+            bottomPane.setLayout(rowLayout);
 
-            buttonCloseOut.addSelectionListener(widgetSelectedAdapter(e -> {
-                try {
-                    double quantity = Double.parseDouble(data.get(Constants.POSITION));
+            {
+                buttonCloseOut = new Button(bottomPane, SWT.PUSH);
+                buttonCloseOut.setText("Close Out 100%");
+                buttonCloseOut.setLayoutData(new RowData(160, 40));
+                buttonCloseOut.setEnabled(false);
 
-                    if (quantity == 0) return;
+                buttonCloseOut.addSelectionListener(widgetSelectedAdapter(e -> {
+                    try {
+                        double quantity = Double.parseDouble(data.get(Constants.POSITION));
 
-                    ibActions.cancelAllOrders();
+                        if (quantity == 0) return;
 
-                    Direction action = quantity > 0 ? Direction.SELL : Direction.BUY;
-                    int orderId = Integer.parseInt(data.get(Constants.NEXT_ORDER_ID));
+                        ibActions.cancelAllOrders();
 
-                    ibActions.placeFutureOrderMarket(orderId, data.get(Constants.SYMBOL),
-                            data.get(Constants.MONTH),
-                            data.get(Constants.EXCHANGE),
-                            action.name(),
-                            Math.abs(quantity));
+                        Direction action = quantity > 0 ? Direction.SELL : Direction.BUY;
+                        int orderId = Integer.parseInt(data.get(Constants.NEXT_ORDER_ID));
 
-                } catch (Exception exception) {
-                    logger.error("Closing out error", exception);
-                }
-            }));
+                        ibActions.placeFutureOrderMarket(orderId, data.get(Constants.SYMBOL),
+                                data.get(Constants.MONTH),
+                                data.get(Constants.EXCHANGE),
+                                action.name(),
+                                Math.abs(quantity));
+
+                    } catch (Exception exception) {
+                        logger.error("Closing out positions", exception);
+                    }
+                }));
+            }
+            {
+                Button buttonCancelAllOrders = new Button(bottomPane, SWT.PUSH);
+                buttonCancelAllOrders.setText("Cancel All");
+                buttonCancelAllOrders.setLayoutData(new RowData(160, 40));
+
+                buttonCancelAllOrders.addSelectionListener(widgetSelectedAdapter(e -> {
+                    try {
+                        ibActions.cancelAllOrders();
+                    } catch (Exception exception) {
+                        logger.error("Cancelling all orders", exception);
+                    }
+                }));
+            }
         }
 
         shell.pack();
