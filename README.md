@@ -17,8 +17,12 @@ This documentation outlines the steps to get the development environment set up 
 1. Download from [here](http://mirror.intergrid.com.au/apache/maven/maven-3/3.5.3/binaries/apache-maven-3.5.3-bin.zip).
 1. Unzip the downloaded file to a convenient location, such as ``C:\Maven``
 1. Add the following two environment variables:
-``M2_HOME``: ``C:\Maven\apache-maven-3.5.3``
-``MAVEN_HOME``: ``C:\Maven\apache-maven-3.5.3``
+
+ ```
+ M2_HOME=C:\Maven\apache-maven-3.5.3
+ MAVEN_HOME=C:\Maven\apache-maven-3.5.3
+ ```
+
 1. Update the ``PATH`` envieronment variable and append ``%M2_HOME%\bin`` to it.
 
 ### Verify
@@ -49,7 +53,8 @@ test@test-PC MINGW64 ~
 $ cd Code/
 
 test@test-PC MINGW64 ~/Code
-$ git clone https://verbarmont@bitbucket.org/waratah/interactive-brokers-api.git                                Cloning into 'interactive-brokers-api'...
+$ git clone https://verbarmont@bitbucket.org/waratah/interactive-brokers-api.git
+Cloning into 'interactive-brokers-api'...
 remote: Counting objects: 547, done.
 remote: Compressing objects: 100% (464/464), done.
 remote: Total 547 (delta 68), reused 547 (delta 68)
@@ -89,7 +94,7 @@ Up until now, if you have successfully compiled the IB Java API, then congratula
 The next step is to fetch the code for the **IB Client Tool** and do some real development work. Of course, you may also want to install a proper IDE, such as IntelliJ IDEA, to make life easier. 
 
 ## Compile the IB Client Tool
-1. Clone the source r4espository for the IB Client Tool.
+1. Clone the source respository for the IB Client Tool.
 1. Go to the ``interactive-brokers-client`` directory.
 1. ``mvn package``
 
