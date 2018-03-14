@@ -17,12 +17,10 @@ This documentation outlines the steps to get the development environment set up 
 1. Download from [here](http://mirror.intergrid.com.au/apache/maven/maven-3/3.5.3/binaries/apache-maven-3.5.3-bin.zip).
 1. Unzip the downloaded file to a convenient location, such as ``C:\Maven``
 1. Add the following two environment variables:
-
  ```
  M2_HOME=C:\Maven\apache-maven-3.5.3
  MAVEN_HOME=C:\Maven\apache-maven-3.5.3
  ```
-
 1. Update the ``PATH`` envieronment variable and append ``%M2_HOME%\bin`` to it.
 
 ### Verify
@@ -103,7 +101,6 @@ Again, if you see "BUILD SUCCESS", then you are good.
 ## Give it a spin
 1. Open a command prompt window (not Git Bash).
 1. Go to the source code directory and then ``target``, execute:
-
  ```
  java -classpath .\ib-client-1.0-SNAPSHOT-jar-with-dependencies.jar;..\lib\swt_win.jar org.zhuang.trading.IBClientMain
  ```
