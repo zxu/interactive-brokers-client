@@ -1,6 +1,10 @@
-This project is a Java application that demonstrates the usage of Interactive Brokers' API.
+## What does it do
 
-This documentation outlines the steps to get the development environment set up on Windows 7.
+This project is a Java application that facilitates *very short and fast* day trading using Interactive Brokers' Trader Workstation. It provides a convenient GUI that, compared with IB itself, is significantly simplified and consumes much less resources.
+
+It utilises IB's [Java API](https://interactivebrokers.github.io/tws-api/index.html); For the UI part, it uses [SWT](https://www.eclipse.org/swt).
+
+I have documented the following steps to get the development environment set up on Windows 7 for the benefit of my friend who wants to use this tool and is not familiar with Java. (Even though my own dev box is a Mac, I have verified these steps on a fresh Windows virtual machine; hence I promise they are correct. :-))
 
 ## Set up Java
 1. Download and install [Java 8 JDK](http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html).
@@ -11,7 +15,7 @@ This documentation outlines the steps to get the development environment set up 
 1. Edit the ``PATH`` environment variable to **prepend** the following: 
 ``%JAVA_HOME%\bin;``
 
-	**Note**: This has to be added to the very beginning of the ``PATH`` environment in order to override the existing path that was created by the JDK installer. That existing path does not contain the Java Compiler which we will need in subsequent steps.
+	**Note**: This has to be added to the very beginning of the ``PATH`` environment variable in order to override the existing path that was created by the JDK installer. That existing path does not contain the Java Compiler which we will need in subsequent steps.
 
 ## Set up Maven
 1. Download from [here](http://mirror.intergrid.com.au/apache/maven/maven-3/3.5.3/binaries/apache-maven-3.5.3-bin.zip).
@@ -92,7 +96,7 @@ Up until now, if you have successfully compiled the IB Java API, then congratula
 The next step is to fetch the code for the **IB Client Tool** and do some real development work. Of course, you may also want to install a proper IDE, such as IntelliJ IDEA, to make life easier. 
 
 ## Compile the IB Client Tool
-1. Clone the source respository for the IB Client Tool.
+1. Clone the source repository of this project.
 1. Go to the ``interactive-brokers-client`` directory.
 1. ``mvn package``
 
