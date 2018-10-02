@@ -25,7 +25,7 @@ I have documented the following steps to get the development environment set up 
  M2_HOME=C:\Maven\apache-maven-3.5.3
  MAVEN_HOME=C:\Maven\apache-maven-3.5.3
  ```
-1. Update the ``PATH`` envieronment variable and append ``%M2_HOME%\bin`` to it.
+1. Update the ``PATH`` environment variable and append ``%M2_HOME%\bin`` to it.
 
 ### Verify
 Open a command prompt window and execute ``mvn -v``. Expect to see something like below:
