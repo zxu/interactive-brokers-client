@@ -15,7 +15,7 @@
         <spring.version>4.3.10.RELEASE</spring.version>
         <tws-api.version>9.73.06</tws-api.version>
         <guava.version>23.0</guava.version>
-        <junit.version>4.12</junit.version>
+        <junit.version>4.13.1</junit.version>
         <logback-classic.version>1.2.3</logback-classic.version>
         <commons-lang3.version>3.6</commons-lang3.version>
         <maven-jar-plugin.version>3.0.2</maven-jar-plugin.version>
